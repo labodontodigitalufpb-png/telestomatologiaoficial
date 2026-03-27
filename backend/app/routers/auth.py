@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token
 from app.models.user import User
 from app.schemas.user import UserCreate, UserOut
-from app.schemas.auth import LoginRequest, Token
+from app.schemas.auth import Token
 
 router = APIRouter()
 
@@ -52,8 +53,11 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(login_data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == login_data.email).first()
+def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == form_data.username).first()
 
     if not user:
         raise HTTPException(
@@ -61,7 +65,7 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             detail="Credenciais inválidas."
         )
 
-    if not verify_password(login_data.password, user.password_hash):
+    if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas."

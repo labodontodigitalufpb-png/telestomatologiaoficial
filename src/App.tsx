@@ -1,1048 +1,607 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { login, logout } from "./services/auth";
+import { registerUser } from "./services/users";
+import {
+  createCase,
+  listMyCases,
+  submitCase,
+  getCaseDetail,
+} from "./services/cases";
+import {
+  listTeleconsultorCases,
+  respondCase,
+} from "./services/teleconsultor";
+import {
+  listRegulatorCases,
+  createFollowup,
+  listFollowups,
+  updateFollowup,
+} from "./services/telerregulador";
 
-type ScreenKey =
-  | "inicio"
-  | "cadastroProfissional"
-  | "caso"
+type Screen =
+  | "login"
+  | "cadastro"
+  | "profissional"
   | "teleconsultor"
-  | "chat"
-  | "telerregulador"
-  | "dashboard";
+  | "telerregulador";
 
-type CardProps = {
+type MessageState = {
+  type: "success" | "error" | "";
+  text: string;
+};
+
+const initialRegister = {
+  full_name: "",
+  email: "",
+  password: "",
+  role: "PROFESSIONAL",
+  age: "",
+  sex: "",
+  municipality: "",
+  state: "",
+  address: "",
+  health_unit: "",
+  specialty: "",
+  professional_council: "",
+  academic_background: "",
+};
+
+const initialCase = {
+  patient_name: "",
+  patient_age: "",
+  patient_sex: "",
+  patient_phone: "",
+  sus_card: "",
+  health_unit: "",
+  municipality: "",
+  state: "",
+  chief_complaint: "",
+  history_present_illness: "",
+  medical_history: "",
+  dental_history: "",
+  medications: "",
+  extraoral_exam: "",
+  lesion_description: "",
+  diagnostic_hypothesis: "",
+};
+
+const initialResponse = {
+  clinical_description: "",
+  justified_hypotheses: "",
+  conduct: "",
+  care_coordination: "",
+  references: "",
+  marked_as_suspected: false,
+};
+
+const initialFollowup = {
+  microscopic_report_date: "",
+  head_neck_or_oncology_visit_date: "",
+  treatment_start_date: "",
+  followup_3m_date: "",
+  followup_6m_date: "",
+  treatments_done: "",
+  clinical_status: "",
+  notes: "",
+};
+
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
   children: React.ReactNode;
-  className?: string;
-};
-
-type FieldProps = {
-  label: string;
-  placeholder?: string;
-  type?: string;
-};
-
-function Card({ children, className = "" }: CardProps) {
+}) {
   return (
-    <div
-      className={`bg-white border border-slate-200 rounded-3xl shadow-sm ${className}`}
-    >
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+      <h2 className="text-lg font-bold text-slate-900 mb-4">{title}</h2>
       {children}
     </div>
   );
 }
 
-function InputField({
+function Input({
   label,
-  placeholder = "",
+  value,
+  onChange,
   type = "text",
-}: FieldProps) {
+}: {
+  label: string;
+  value: string | number;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
   return (
     <div className="space-y-1">
       <label className="text-sm font-medium text-slate-700">{label}</label>
       <input
         type={type}
-        placeholder={placeholder}
-        className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
       />
     </div>
   );
 }
 
-function TextAreaField({ label, placeholder = "" }: FieldProps) {
+function TextArea({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-1">
       <label className="text-sm font-medium text-slate-700">{label}</label>
       <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         rows={4}
-        placeholder={placeholder}
-        className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
       />
-    </div>
-  );
-}
-
-function SectionHeader({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="mb-6">
-      <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
-      <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
-    </div>
-  );
-}
-
-function UploadBox({ title }: { title: string }) {
-  return (
-    <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-4 text-center">
-      <div className="text-sm font-medium text-slate-700">{title}</div>
-      <div className="text-xs text-slate-500 mt-1">
-        Selecionar imagem, exame ou documento
-      </div>
-      <button
-        type="button"
-        className="mt-3 rounded-xl bg-emerald-600 text-white px-4 py-2 text-sm font-medium"
-      >
-        Enviar arquivo
-      </button>
     </div>
   );
 }
 
 export default function App() {
-  const [activeScreen, setActiveScreen] = useState<ScreenKey>("inicio");
-  const [cadastroConcluido, setCadastroConcluido] = useState(false);
+  const [screen, setScreen] = useState<Screen>("login");
+  const [message, setMessage] = useState<MessageState>({ type: "", text: "" });
 
-  const menuItems: { key: ScreenKey; label: string }[] = useMemo(
-    () => [
-      { key: "inicio", label: "Início" },
-      { key: "cadastroProfissional", label: "Cadastro profissional" },
-      { key: "caso", label: "Relato de caso" },
-      { key: "teleconsultor", label: "Teleconsultor" },
-      { key: "chat", label: "Chat" },
-      { key: "telerregulador", label: "Telerregulador" },
-      { key: "dashboard", label: "Dashboard" },
-    ],
-    []
-  );
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
-  const liberarEnvio = () => {
-    setCadastroConcluido(true);
-    setActiveScreen("caso");
-  };
+  const [registerForm, setRegisterForm] = useState(initialRegister);
+  const [caseForm, setCaseForm] = useState(initialCase);
+  const [teleResponseForm, setTeleResponseForm] = useState(initialResponse);
+  const [followupForm, setFollowupForm] = useState(initialFollowup);
 
-  const renderScreen = () => {
-    switch (activeScreen) {
-      case "inicio":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Telestomatologia no SUS"
-              subtitle="Teleconsultoria em estomatologia para apoio aos profissionais da Atenção Básica"
-            />
+  const [myCases, setMyCases] = useState<any[]>([]);
+  const [teleCases, setTeleCases] = useState<any[]>([]);
+  const [regulatorCases, setRegulatorCases] = useState<any[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  const [selectedResponseCaseId, setSelectedResponseCaseId] = useState<string>("");
+  const [selectedFollowupCaseId, setSelectedFollowupCaseId] = useState<string>("");
+  const [caseDetail, setCaseDetail] = useState<any>(null);
+  const [followups, setFollowups] = useState<any[]>([]);
+  const [followupIdToEdit, setFollowupIdToEdit] = useState<string>("");
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-              <Card className="p-6 xl:col-span-2 bg-gradient-to-br from-emerald-700 to-emerald-600 text-white border-0">
-                <div className="text-sm uppercase tracking-wide opacity-80">
-                  Plataforma de apoio clínico
-                </div>
-                <h3 className="text-3xl font-bold mt-2 leading-tight">
-                  Avaliação remota de casos de doenças da boca com fluxo
-                  assistencial estruturado
-                </h3>
-                <p className="mt-4 text-sm text-emerald-50 max-w-2xl">
-                  O profissional de saúde faz seu cadastro, envia o caso clínico
-                  e o sistema distribui automaticamente para um teleconsultor do
-                  mesmo estado. Casos suspeitos seguem para acompanhamento por
-                  telerreguladores estaduais.
-                </p>
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setActiveScreen("cadastroProfissional")}
-                    className="rounded-2xl bg-white text-emerald-700 px-5 py-3 text-sm font-semibold"
-                  >
-                    Criar conta
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveScreen("caso")}
-                    className="rounded-2xl border border-white/40 px-5 py-3 text-sm font-semibold"
-                  >
-                    Acessar plataforma
-                  </button>
-                </div>
-              </Card>
+  function showSuccess(text: string) {
+    setMessage({ type: "success", text });
+  }
 
-              <Card className="p-6">
-                <div className="text-sm font-semibold text-slate-900">
-                  Acesso rápido
-                </div>
-                <div className="mt-4 space-y-3">
-                  <InputField
-                    label="E-mail"
-                    placeholder="profissional@saude.gov.br"
-                    type="email"
-                  />
-                  <InputField
-                    label="Senha"
-                    placeholder="••••••••"
-                    type="password"
-                  />
-                  <button
-                    type="button"
-                    className="w-full rounded-2xl bg-emerald-600 text-white py-3 text-sm font-semibold"
-                  >
-                    Entrar
-                  </button>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
+  function showError(text: string) {
+    setMessage({ type: "error", text });
+  }
 
-      case "cadastroProfissional":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Cadastro do profissional de saúde"
-              subtitle="Registro para acesso ao envio de casos e recebimento das respostas"
-            />
+  function clearMessage() {
+    setMessage({ type: "", text: "" });
+  }
 
-            <Card className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                <InputField label="Nome" placeholder="Nome completo" />
-                <InputField label="Idade" placeholder="Ex.: 35" />
-                <InputField label="Sexo" placeholder="Selecionar" />
-                <InputField
-                  label="E-mail"
-                  placeholder="email@exemplo.com"
-                  type="email"
-                />
-                <InputField
-                  label="Endereço completo"
-                  placeholder="Rua, número, bairro"
-                />
-                <InputField label="Município" placeholder="Município" />
-                <InputField label="Estado" placeholder="UF" />
-                <InputField
-                  label="Unidade de atendimento 1"
-                  placeholder="Nome da unidade"
-                />
-                <InputField
-                  label="Unidade de atendimento 2"
-                  placeholder="Adicionar outra unidade"
-                />
-                <InputField
-                  label="Área profissional"
-                  placeholder="Odontologia, Medicina, Enfermagem..."
-                />
-                <InputField
-                  label="Especialidade"
-                  placeholder="Ex.: Saúde da Família"
-                />
-                <InputField
-                  label="Número do conselho profissional"
-                  placeholder="CRO / CRM / COREN"
-                />
-                <InputField
-                  label="Senha"
-                  placeholder="Criar senha"
-                  type="password"
-                />
-              </div>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={liberarEnvio}
-                  className="rounded-2xl bg-emerald-600 text-white px-5 py-3 text-sm font-semibold"
-                >
-                  Concluir cadastro
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveScreen("inicio")}
-                  className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
-                >
-                  Voltar
-                </button>
-              </div>
-
-              {cadastroConcluido && (
-                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-                  Cadastro concluído com sucesso. O envio de casos foi liberado.
-                </div>
-              )}
-            </Card>
-          </div>
-        );
-
-      case "caso":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Relato de caso e acompanhamento"
-              subtitle="Tela do profissional para envio do caso clínico e acesso à resposta do teleconsultor"
-            />
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-              <Card className="p-6 xl:col-span-2">
-                <div className="text-lg font-bold text-slate-900 mb-4">
-                  Novo caso
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField
-                    label="Nome do paciente"
-                    placeholder="Nome completo"
-                  />
-                  <InputField label="Idade" placeholder="Ex.: 58" />
-                  <InputField label="Sexo" placeholder="Selecionar" />
-                  <InputField
-                    label="Telefone"
-                    placeholder="(00) 00000-0000"
-                  />
-                  <InputField
-                    label="Cartão do SUS"
-                    placeholder="000 0000 0000 0000"
-                  />
-                  <InputField
-                    label="Unidade de atendimento"
-                    placeholder="Selecionar unidade"
-                  />
-                  <InputField label="Município" placeholder="Município" />
-                  <InputField label="Estado" placeholder="UF" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <TextAreaField
-                    label="Queixa principal"
-                    placeholder="Descreva a principal queixa"
-                  />
-                  <TextAreaField
-                    label="História da doença atual"
-                    placeholder="Tempo de evolução, sintomas, fatores associados"
-                  />
-                  <TextAreaField
-                    label="História médica"
-                    placeholder="Doenças sistêmicas relevantes"
-                  />
-                  <TextAreaField
-                    label="História odontológica"
-                    placeholder="Informações odontológicas relevantes"
-                  />
-                  <TextAreaField
-                    label="Uso de medicamentos"
-                    placeholder="Medicamentos em uso"
-                  />
-                  <TextAreaField
-                    label="Exame físico extraoral"
-                    placeholder="Achados extraorais"
-                  />
-                  <TextAreaField
-                    label="Descrição clínica da(s) lesão(ões)"
-                    placeholder="Localização, cor, forma, tamanho, superfície, limites"
-                  />
-                  <TextAreaField
-                    label="Hipóteses de diagnóstico"
-                    placeholder="Hipóteses clínicas iniciais"
-                  />
-                </div>
-
-                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-                  <UploadBox title="Foto clínica 1" />
-                  <UploadBox title="Foto clínica 2" />
-                  <UploadBox title="Foto clínica 3" />
-                  <UploadBox title="Exame complementar" />
-                  <UploadBox title="TCLE" />
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                  <div className="text-sm font-semibold text-amber-800">
-                    Validação de cadastro
-                  </div>
-                  <p className="mt-1 text-sm text-amber-700">
-                    O envio do caso só é permitido após o cadastro completo do
-                    profissional e acesso autenticado no sistema.
-                  </p>
-
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      disabled={!cadastroConcluido}
-                      className={`rounded-2xl px-5 py-3 text-sm font-semibold ${
-                        cadastroConcluido
-                          ? "bg-emerald-600 text-white"
-                          : "bg-slate-300 text-slate-600 cursor-not-allowed"
-                      }`}
-                    >
-                      Enviar caso
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
-                    >
-                      Salvar rascunho
-                    </button>
-
-                    {!cadastroConcluido && (
-                      <button
-                        type="button"
-                        onClick={() => setActiveScreen("cadastroProfissional")}
-                        className="rounded-2xl bg-emerald-600 text-white px-5 py-3 text-sm font-semibold"
-                      >
-                        Fazer cadastro para liberar envio
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <div className="text-lg font-bold text-slate-900">
-                  Meus casos
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-slate-800">
-                        Caso #2026-018
-                      </div>
-                      <span className="rounded-full bg-amber-100 text-amber-700 px-3 py-1 text-xs font-semibold">
-                        Em análise
-                      </span>
-                    </div>
-                    <div className="text-sm text-slate-500 mt-2">
-                      Paciente, 61 anos • Lesão em borda lateral de língua
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-slate-800">
-                        Caso #2026-011
-                      </div>
-                      <span className="rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">
-                        Respondido
-                      </span>
-                    </div>
-                    <div className="text-sm text-slate-500 mt-2">
-                      Hipótese principal: líquen plano oral
-                    </div>
-                    <button
-                      type="button"
-                      className="mt-3 text-sm font-semibold text-emerald-700"
-                    >
-                      Ver resposta do teleconsultor
-                    </button>
-                  </div>
-
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-semibold text-slate-800">
-                        Caso #2026-004
-                      </div>
-                      <span className="rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">
-                        Suspeito
-                      </span>
-                    </div>
-                    <div className="text-sm text-slate-500 mt-2">
-                      Acompanhado por telerregulador estadual
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
-
-      case "teleconsultor":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Painel do teleconsultor"
-              subtitle="Recebimento automático de casos por estado e resposta técnica especializada"
-            />
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-              <Card className="p-6">
-                <div className="text-lg font-bold text-slate-900 mb-4">
-                  Cadastro do teleconsultor
-                </div>
-
-                <div className="space-y-3">
-                  <InputField label="Nome" placeholder="Nome completo" />
-                  <InputField label="Idade" placeholder="Ex.: 44" />
-                  <InputField label="Sexo" placeholder="Selecionar" />
-                  <InputField
-                    label="E-mail"
-                    placeholder="teleconsultor@saude.gov.br"
-                    type="email"
-                  />
-                  <InputField label="Município" placeholder="Município" />
-                  <InputField label="Estado" placeholder="UF" />
-                  <InputField
-                    label="Formação profissional"
-                    placeholder="Graduação, especialização, mestrado e doutorado"
-                  />
-                  <InputField
-                    label="Número do conselho profissional"
-                    placeholder="CRO"
-                  />
-                  <InputField
-                    label="Senha"
-                    placeholder="Criar senha"
-                    type="password"
-                  />
-                  <button
-                    type="button"
-                    className="w-full rounded-2xl bg-emerald-600 text-white py-3 text-sm font-semibold"
-                  >
-                    Cadastrar teleconsultor
-                  </button>
-                </div>
-              </Card>
-
-              <Card className="p-6 xl:col-span-2">
-                <div className="flex items-center justify-between mb-4 gap-3">
-                  <div>
-                    <div className="text-lg font-bold text-slate-900">
-                      Caso distribuído automaticamente
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      Distribuição por estado do profissional solicitante
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-blue-100 text-blue-700 px-3 py-1 text-xs font-semibold">
-                    PB • Prioridade moderada
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField
-                    label="Nome do consultor"
-                    placeholder="Preenchido automaticamente"
-                  />
-                  <InputField
-                    label="E-mail do consultor"
-                    placeholder="Preenchido automaticamente"
-                  />
-                  <TextAreaField
-                    label="Descrição clínica"
-                    placeholder="Síntese dos achados clínicos"
-                  />
-                  <TextAreaField
-                    label="Hipóteses diagnósticas justificadas"
-                    placeholder="Descrever hipóteses com justificativa"
-                  />
-                  <TextAreaField
-                    label="Conduta no caso"
-                    placeholder="Orientações e encaminhamentos"
-                  />
-                  <TextAreaField
-                    label="Coordenação do cuidado"
-                    placeholder="Fluxo assistencial e seguimento"
-                  />
-                  <TextAreaField
-                    label="Referências bibliográficas"
-                    placeholder="Inserir referências utilizadas"
-                  />
-
-                  <div className="rounded-2xl border border-slate-200 p-4 bg-slate-50">
-                    <div className="text-sm font-semibold text-slate-800">
-                      Classificação do caso
-                    </div>
-                    <div className="mt-3 space-y-2 text-sm text-slate-700">
-                      <label className="flex items-center gap-2">
-                        <input type="radio" name="suspeito" />
-                        Caso não suspeito
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="radio" name="suspeito" />
-                        Marcar como lesão suspeita
-                      </label>
-                    </div>
-                    <div className="text-xs text-slate-500 mt-3">
-                      Ao marcar como suspeita, o caso é enviado ao
-                      telerregulador estadual.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="rounded-2xl bg-emerald-600 text-white px-5 py-3 text-sm font-semibold"
-                  >
-                    Enviar resposta
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveScreen("chat")}
-                    className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
-                  >
-                    Abrir chat do caso
-                  </button>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
-
-      case "chat":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Chat do caso"
-              subtitle="Troca de mensagens, imagens e áudios entre profissional e teleconsultor"
-            />
-
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-5">
-              <Card className="p-4 xl:col-span-1">
-                <div className="text-sm font-semibold text-slate-900">
-                  Casos com conversa ativa
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-3">
-                    <div className="font-semibold text-slate-800">
-                      Caso #2026-011
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      Atualização clínica enviada hoje
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 p-3">
-                    <div className="font-semibold text-slate-800">
-                      Caso #2026-018
-                    </div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      Aguardando resposta do teleconsultor
-                    </div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-0 overflow-hidden xl:col-span-3">
-                <div className="border-b border-slate-200 px-6 py-4 flex items-center justify-between gap-3 bg-slate-50">
-                  <div>
-                    <div className="font-bold text-slate-900">
-                      Chat do Caso #2026-011
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      Profissional solicitante ↔ Teleconsultor estadual
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-semibold">
-                    Conversa armazenada no caso
-                  </span>
-                </div>
-
-                <div className="p-6 space-y-4 bg-slate-50 min-h-[430px]">
-                  <div className="flex justify-start">
-                    <div className="max-w-xl rounded-2xl rounded-tl-sm bg-white border border-slate-200 p-4 text-sm text-slate-700 shadow-sm">
-                      Poderia informar se houve aumento de tamanho da lesão nas
-                      últimas semanas?
-                      <div className="text-xs text-slate-400 mt-2">
-                        Teleconsultor • 09:14
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <div className="max-w-xl rounded-2xl rounded-tr-sm bg-emerald-600 text-white p-4 text-sm shadow-sm">
-                      Sim. Também estou anexando nova foto clínica e um áudio
-                      com atualização do caso.
-                      <div className="text-xs text-emerald-100 mt-2">
-                        Profissional • 09:18
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 flex-wrap">
-                    <div className="rounded-2xl bg-white border border-slate-200 p-3 text-sm text-slate-600">
-                      🖼️ imagem_lesao_03.jpg
-                    </div>
-                    <div className="rounded-2xl bg-white border border-slate-200 p-3 text-sm text-slate-600">
-                      🎤 audio_atualizacao.m4a
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-200 p-4 bg-white">
-                  <div className="flex flex-col md:flex-row gap-3">
-                    <input
-                      className="flex-1 rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Escreva uma mensagem sobre a evolução do caso..."
-                    />
-                    <button
-                      type="button"
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold"
-                    >
-                      Imagem
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold"
-                    >
-                      Áudio
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-2xl bg-emerald-600 text-white px-5 py-3 text-sm font-semibold"
-                    >
-                      Enviar
-                    </button>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
-
-      case "telerregulador":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Painel do telerregulador estadual"
-              subtitle="Acompanhamento longitudinal dos casos suspeitos sinalizados pelo teleconsultor"
-            />
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-              <Card className="p-6">
-                <div className="text-lg font-bold text-slate-900 mb-4">
-                  Cadastro e login
-                </div>
-
-                <div className="space-y-3">
-                  <InputField label="Nome" placeholder="Nome completo" />
-                  <InputField label="Idade" placeholder="Ex.: 40" />
-                  <InputField label="Sexo" placeholder="Selecionar" />
-                  <InputField
-                    label="E-mail"
-                    placeholder="telerregulador@saude.gov.br"
-                    type="email"
-                  />
-                  <InputField label="Município" placeholder="Município" />
-                  <InputField label="Estado" placeholder="UF" />
-                  <InputField
-                    label="Formação profissional"
-                    placeholder="Graduação, especialização, mestrado e doutorado"
-                  />
-                  <InputField
-                    label="Número do conselho profissional"
-                    placeholder="CRO"
-                  />
-                  <InputField
-                    label="Senha"
-                    placeholder="Criar senha"
-                    type="password"
-                  />
-                  <button
-                    type="button"
-                    className="w-full rounded-2xl bg-emerald-600 text-white py-3 text-sm font-semibold"
-                  >
-                    Acessar painel
-                  </button>
-                </div>
-              </Card>
-
-              <Card className="p-6 xl:col-span-2">
-                <div className="flex items-center justify-between mb-4 gap-3">
-                  <div>
-                    <div className="text-lg font-bold text-slate-900">
-                      Caso suspeito em acompanhamento
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      Encaminhado pelo teleconsultor estadual
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">
-                    Suspeita de malignidade
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <InputField
-                    label="Laudo microscópico — data de entrega"
-                    placeholder="dd/mm/aaaa"
-                  />
-                  <InputField
-                    label="Consulta com cirurgia de cabeça e pescoço / oncologia"
-                    placeholder="dd/mm/aaaa"
-                  />
-                  <InputField
-                    label="Início do tratamento"
-                    placeholder="dd/mm/aaaa"
-                  />
-                  <InputField
-                    label="Acompanhamento em 3 meses"
-                    placeholder="dd/mm/aaaa"
-                  />
-                  <InputField
-                    label="Acompanhamento em 6 meses"
-                    placeholder="dd/mm/aaaa"
-                  />
-                  <InputField
-                    label="Situação clínica atual"
-                    placeholder="Em investigação, em tratamento, concluído..."
-                  />
-                  <TextAreaField
-                    label="Tratamentos realizados"
-                    placeholder="Cirurgia, biópsia, radioterapia, quimioterapia, suporte clínico..."
-                  />
-                  <TextAreaField
-                    label="Observações do seguimento"
-                    placeholder="Descrição da evolução clínica do paciente"
-                  />
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    className="rounded-2xl bg-emerald-600 text-white px-5 py-3 text-sm font-semibold"
-                  >
-                    Salvar acompanhamento
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
-                  >
-                    Ver histórico do caso
-                  </button>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
-
-      case "dashboard":
-        return (
-          <div className="space-y-6">
-            <SectionHeader
-              title="Dashboard de gestão da telestomatologia"
-              subtitle="Monitoramento dos casos, respostas técnicas e seguimento estadual"
-            />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
-              {[
-                ["1.248", "Casos relatados"],
-                ["972", "Teleconsultorias feitas"],
-                ["184", "Casos suspeitos"],
-                ["6,2 dias", "Tempo médio de resposta"],
-                ["138", "Casos acompanhados"],
-                ["15", "Estados ativos"],
-              ].map(([value, label]) => (
-                <Card key={label} className="p-5">
-                  <div className="text-2xl font-bold text-slate-900">
-                    {value}
-                  </div>
-                  <div className="text-sm text-slate-500 mt-1">{label}</div>
-                </Card>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-              <Card className="p-6 xl:col-span-2">
-                <div className="text-lg font-bold text-slate-900 mb-5">
-                  Casos por estado
-                </div>
-
-                <div className="space-y-4">
-                  {[
-                    ["Paraíba", 88],
-                    ["Ceará", 73],
-                    ["Pernambuco", 61],
-                    ["Rio Grande do Norte", 49],
-                    ["Bahia", 36],
-                  ].map(([state, pct]) => (
-                    <div key={state}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-slate-700 font-medium">
-                          {state}
-                        </span>
-                        <span className="text-slate-500">{pct} casos</span>
-                      </div>
-                      <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-emerald-600"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <div className="text-lg font-bold text-slate-900">
-                  Casos suspeitos por estado
-                </div>
-
-                <div className="mt-4 space-y-3 text-sm">
-                  {[
-                    ["PB", "42"],
-                    ["CE", "31"],
-                    ["PE", "24"],
-                    ["RN", "19"],
-                    ["BA", "11"],
-                  ].map(([uf, n]) => (
-                    <div
-                      key={uf}
-                      className="flex items-center justify-between rounded-2xl border border-slate-200 p-3"
-                    >
-                      <span className="font-semibold text-slate-700">
-                        {uf}
-                      </span>
-                      <span className="rounded-full bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold">
-                        {n} suspeitos
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-              <Card className="p-6">
-                <div className="text-lg font-bold text-slate-900">
-                  Tempo para teleconsultoria realizada
-                </div>
-
-                <div className="mt-5 flex items-end gap-3 h-56">
-                  {[5, 7, 4, 8, 6, 5, 3].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 flex flex-col items-center gap-2"
-                    >
-                      <div
-                        className="w-full rounded-t-2xl bg-emerald-500"
-                        style={{ height: `${h * 24}px` }}
-                      />
-                      <span className="text-xs text-slate-500">S{i + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <div className="text-lg font-bold text-slate-900">
-                  Casos acompanhados por telerreguladores
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-slate-700">
-                        Em investigação diagnóstica
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        52
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-slate-700">
-                        Em tratamento
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        41
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-slate-700">
-                        Acompanhamento 3 meses
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        28
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-slate-50 border border-slate-200 p-4">
-                    <div className="flex justify-between">
-                      <span className="text-sm font-medium text-slate-700">
-                        Acompanhamento 6 meses
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">
-                        17
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    clearMessage();
+    try {
+      await login(loginEmail, loginPassword);
+      showSuccess("Login realizado com sucesso.");
+    } catch (error: any) {
+      showError(error.message);
     }
-  };
+  }
+
+  async function handleRegister(e: React.FormEvent) {
+    e.preventDefault();
+    clearMessage();
+    try {
+      await registerUser({
+        ...registerForm,
+        age: registerForm.age ? Number(registerForm.age) : null,
+      });
+      showSuccess("Usuário cadastrado com sucesso.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleCreateCase(e: React.FormEvent) {
+    e.preventDefault();
+    clearMessage();
+    try {
+      await createCase({
+        ...caseForm,
+        patient_age: caseForm.patient_age ? Number(caseForm.patient_age) : null,
+      });
+      showSuccess("Caso criado com sucesso.");
+      setCaseForm(initialCase);
+      await handleLoadMyCases();
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleLoadMyCases() {
+    clearMessage();
+    try {
+      const data = await listMyCases();
+      setMyCases(data);
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleSubmitCase(caseId: number) {
+    clearMessage();
+    try {
+      await submitCase(caseId);
+      showSuccess("Caso submetido com sucesso.");
+      await handleLoadMyCases();
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleLoadCaseDetail() {
+    if (!selectedCaseId) return;
+    clearMessage();
+    try {
+      const data = await getCaseDetail(Number(selectedCaseId));
+      setCaseDetail(data);
+      showSuccess("Detalhe do caso carregado.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleLoadTeleCases() {
+    clearMessage();
+    try {
+      const data = await listTeleconsultorCases();
+      setTeleCases(data);
+    } catch (error: any) {
+      showSuccess("Lista do teleconsultor carregada.");
+      setTeleCases([]);
+    }
+  }
+
+  async function handleRespondCase(e: React.FormEvent) {
+    e.preventDefault();
+    clearMessage();
+    try {
+      await respondCase(Number(selectedResponseCaseId), teleResponseForm);
+      showSuccess("Resposta do teleconsultor registrada com sucesso.");
+      setTeleResponseForm(initialResponse);
+      await handleLoadTeleCases();
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleLoadRegulatorCases() {
+    clearMessage();
+    try {
+      const data = await listRegulatorCases();
+      setRegulatorCases(data);
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleCreateFollowup(e: React.FormEvent) {
+    e.preventDefault();
+    clearMessage();
+    try {
+      await createFollowup(Number(selectedFollowupCaseId), followupForm);
+      showSuccess("Seguimento criado com sucesso.");
+      setFollowupForm(initialFollowup);
+      await handleLoadFollowups();
+      await handleLoadRegulatorCases();
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleLoadFollowups() {
+    if (!selectedFollowupCaseId) return;
+    clearMessage();
+    try {
+      const data = await listFollowups(Number(selectedFollowupCaseId));
+      setFollowups(data);
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleUpdateFollowup(e: React.FormEvent) {
+    e.preventDefault();
+    clearMessage();
+    try {
+      await updateFollowup(Number(followupIdToEdit), followupForm);
+      showSuccess("Seguimento atualizado com sucesso.");
+      await handleLoadFollowups();
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  useEffect(() => {
+    setCaseDetail(null);
+  }, [selectedCaseId]);
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="flex flex-col xl:flex-row">
-        <aside className="xl:w-80 bg-slate-950 text-white p-6 xl:min-h-screen">
-          <div className="rounded-3xl bg-white p-5 shadow-lg border border-slate-200">
-            <div className="flex items-center justify-center gap-4 flex-wrap">
-              <img
-                src="/brasil-sorridente.png"
-                alt="Brasil Sorridente"
-                className="h-16 w-auto object-contain rounded-xl bg-white"
-              />
-              <img
-                src="/logolab.png"
-                alt="LABODIGIT"
-                className="h-16 w-auto object-contain rounded-xl bg-white"
-              />
-            </div>
-
-            <div className="text-center mt-4">
-              <h1 className="text-xl font-bold text-slate-900 leading-tight">
-                Teleconsultoria em Estomatologia
-              </h1>
-              <p className="text-sm text-slate-600 mt-2">
-                Plataforma para cadastro de profissionais, teleconsultoria, chat
-                clínico, regulação estadual e monitoramento por indicadores.
-              </p>
-            </div>
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Telestomatologia no SUS</h1>
+            <p className="text-sm text-slate-600">
+              Integração completa entre frontend React e backend FastAPI.
+            </p>
           </div>
 
-          <nav className="mt-6 space-y-2">
-            {menuItems.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setActiveScreen(item.key)}
-                className={`w-full text-left px-4 py-3 rounded-2xl text-sm font-medium transition ${
-                  activeScreen === item.key
-                    ? "bg-white text-slate-900"
-                    : "text-slate-300 hover:bg-slate-800"
-                }`}
-              >
-                {item.label}
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setScreen("login")} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+              Login
+            </button>
+            <button onClick={() => setScreen("cadastro")} className="px-4 py-2 rounded-xl border border-slate-300">
+              Cadastro
+            </button>
+            <button onClick={() => setScreen("profissional")} className="px-4 py-2 rounded-xl border border-slate-300">
+              Profissional
+            </button>
+            <button onClick={() => setScreen("teleconsultor")} className="px-4 py-2 rounded-xl border border-slate-300">
+              Teleconsultor
+            </button>
+            <button onClick={() => setScreen("telerregulador")} className="px-4 py-2 rounded-xl border border-slate-300">
+              Telerregulador
+            </button>
+            <button
+              onClick={() => {
+                logout();
+                showSuccess("Logout realizado.");
+              }}
+              className="px-4 py-2 rounded-xl bg-rose-600 text-white"
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+
+        {message.text && (
+          <div
+            className={`rounded-2xl p-4 text-sm ${
+              message.type === "success"
+                ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
+                : "bg-rose-50 border border-rose-200 text-rose-800"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
+
+        {screen === "login" && (
+          <SectionCard title="Login">
+            <form onSubmit={handleLogin} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input label="E-mail" value={loginEmail} onChange={setLoginEmail} type="email" />
+              <Input label="Senha" value={loginPassword} onChange={setLoginPassword} type="password" />
+              <div className="md:col-span-2">
+                <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">
+                  Entrar
+                </button>
+              </div>
+            </form>
+          </SectionCard>
+        )}
+
+        {screen === "cadastro" && (
+          <SectionCard title="Cadastro de usuário">
+            <form onSubmit={handleRegister} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <Input label="Nome completo" value={registerForm.full_name} onChange={(v) => setRegisterForm({ ...registerForm, full_name: v })} />
+              <Input label="E-mail" value={registerForm.email} onChange={(v) => setRegisterForm({ ...registerForm, email: v })} type="email" />
+              <Input label="Senha" value={registerForm.password} onChange={(v) => setRegisterForm({ ...registerForm, password: v })} type="password" />
+              <Input label="Idade" value={registerForm.age} onChange={(v) => setRegisterForm({ ...registerForm, age: v })} />
+              <Input label="Sexo" value={registerForm.sex} onChange={(v) => setRegisterForm({ ...registerForm, sex: v })} />
+              <Input label="Município" value={registerForm.municipality} onChange={(v) => setRegisterForm({ ...registerForm, municipality: v })} />
+              <Input label="Estado" value={registerForm.state} onChange={(v) => setRegisterForm({ ...registerForm, state: v })} />
+              <Input label="Endereço" value={registerForm.address} onChange={(v) => setRegisterForm({ ...registerForm, address: v })} />
+              <Input label="Unidade de atendimento" value={registerForm.health_unit} onChange={(v) => setRegisterForm({ ...registerForm, health_unit: v })} />
+              <Input label="Especialidade" value={registerForm.specialty} onChange={(v) => setRegisterForm({ ...registerForm, specialty: v })} />
+              <Input label="Conselho profissional" value={registerForm.professional_council} onChange={(v) => setRegisterForm({ ...registerForm, professional_council: v })} />
+              <Input label="Formação acadêmica" value={registerForm.academic_background} onChange={(v) => setRegisterForm({ ...registerForm, academic_background: v })} />
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Perfil</label>
+                <select
+                  value={registerForm.role}
+                  onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="PROFESSIONAL">PROFESSIONAL</option>
+                  <option value="TELECONSULTOR">TELECONSULTOR</option>
+                  <option value="TELERREGULADOR">TELERREGULADOR</option>
+                </select>
+              </div>
+              <div className="xl:col-span-3">
+                <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">
+                  Cadastrar
+                </button>
+              </div>
+            </form>
+          </SectionCard>
+        )}
+
+        {screen === "profissional" && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SectionCard title="Relato de caso">
+              <form onSubmit={handleCreateCase} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input label="Nome do paciente" value={caseForm.patient_name} onChange={(v) => setCaseForm({ ...caseForm, patient_name: v })} />
+                <Input label="Idade" value={caseForm.patient_age} onChange={(v) => setCaseForm({ ...caseForm, patient_age: v })} />
+                <Input label="Sexo" value={caseForm.patient_sex} onChange={(v) => setCaseForm({ ...caseForm, patient_sex: v })} />
+                <Input label="Telefone" value={caseForm.patient_phone} onChange={(v) => setCaseForm({ ...caseForm, patient_phone: v })} />
+                <Input label="Cartão SUS" value={caseForm.sus_card} onChange={(v) => setCaseForm({ ...caseForm, sus_card: v })} />
+                <Input label="Unidade" value={caseForm.health_unit} onChange={(v) => setCaseForm({ ...caseForm, health_unit: v })} />
+                <Input label="Município" value={caseForm.municipality} onChange={(v) => setCaseForm({ ...caseForm, municipality: v })} />
+                <Input label="Estado" value={caseForm.state} onChange={(v) => setCaseForm({ ...caseForm, state: v })} />
+                <div className="md:col-span-2"><TextArea label="Queixa principal" value={caseForm.chief_complaint} onChange={(v) => setCaseForm({ ...caseForm, chief_complaint: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="História da doença atual" value={caseForm.history_present_illness} onChange={(v) => setCaseForm({ ...caseForm, history_present_illness: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="História médica" value={caseForm.medical_history} onChange={(v) => setCaseForm({ ...caseForm, medical_history: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="História odontológica" value={caseForm.dental_history} onChange={(v) => setCaseForm({ ...caseForm, dental_history: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="Medicamentos" value={caseForm.medications} onChange={(v) => setCaseForm({ ...caseForm, medications: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="Exame físico extraoral" value={caseForm.extraoral_exam} onChange={(v) => setCaseForm({ ...caseForm, extraoral_exam: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="Descrição da lesão" value={caseForm.lesion_description} onChange={(v) => setCaseForm({ ...caseForm, lesion_description: v })} /></div>
+                <div className="md:col-span-2"><TextArea label="Hipótese diagnóstica" value={caseForm.diagnostic_hypothesis} onChange={(v) => setCaseForm({ ...caseForm, diagnostic_hypothesis: v })} /></div>
+                <div className="md:col-span-2">
+                  <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">
+                    Criar caso
+                  </button>
+                </div>
+              </form>
+            </SectionCard>
+
+            <SectionCard title="Meus casos">
+              <div className="flex gap-2 mb-4">
+                <button onClick={handleLoadMyCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar lista
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {myCases.map((item) => (
+                  <div key={item.id} className="border border-slate-200 rounded-xl p-4">
+                    <div className="font-semibold">Caso #{item.id} — {item.patient_name}</div>
+                    <div className="text-sm text-slate-600">Status: {item.status}</div>
+                    <div className="text-sm text-slate-600">Estado: {item.state}</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => handleSubmitCase(item.id)}
+                        className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm"
+                      >
+                        Submeter caso
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 border-t pt-4">
+                <Input label="ID do caso para detalhe" value={selectedCaseId} onChange={setSelectedCaseId} />
+                <div className="mt-3">
+                  <button onClick={handleLoadCaseDetail} className="px-4 py-2 rounded-xl border border-slate-300">
+                    Ver detalhe do caso
+                  </button>
+                </div>
+
+                {caseDetail && (
+                  <pre className="mt-4 bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto text-xs">
+                    {JSON.stringify(caseDetail, null, 2)}
+                  </pre>
+                )}
+              </div>
+            </SectionCard>
+          </div>
+        )}
+
+        {screen === "teleconsultor" && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SectionCard title="Casos do teleconsultor">
+              <button onClick={handleLoadTeleCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
+                Atualizar casos atribuídos
               </button>
-            ))}
-          </nav>
 
-          <div className="mt-8 rounded-3xl border border-slate-800 p-5">
-            <div className="text-sm font-semibold">Fluxo assistencial</div>
-            <ol className="mt-3 space-y-2 text-sm text-slate-300 list-decimal list-inside">
-              <li>Cadastro do profissional</li>
-              <li>Envio do caso clínico</li>
-              <li>Distribuição automática por estado</li>
-              <li>Resposta do teleconsultor</li>
-              <li>Chat para atualização do caso</li>
-              <li>Acionamento do telerregulador</li>
-              <li>Acompanhamento por dashboard</li>
-            </ol>
+              <div className="space-y-3">
+                {teleCases.map((item) => (
+                  <div key={item.id} className="border border-slate-200 rounded-xl p-4">
+                    <div className="font-semibold">Caso #{item.id} — {item.patient_name}</div>
+                    <div className="text-sm text-slate-600">Estado: {item.state}</div>
+                    <div className="text-sm text-slate-600">Status: {item.status}</div>
+                    <div className="text-sm text-slate-600">Hipótese: {item.diagnostic_hypothesis}</div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Responder caso">
+              <form onSubmit={handleRespondCase} className="space-y-4">
+                <Input label="ID do caso" value={selectedResponseCaseId} onChange={setSelectedResponseCaseId} />
+                <TextArea label="Descrição clínica" value={teleResponseForm.clinical_description} onChange={(v) => setTeleResponseForm({ ...teleResponseForm, clinical_description: v })} />
+                <TextArea label="Hipóteses justificadas" value={teleResponseForm.justified_hypotheses} onChange={(v) => setTeleResponseForm({ ...teleResponseForm, justified_hypotheses: v })} />
+                <TextArea label="Conduta" value={teleResponseForm.conduct} onChange={(v) => setTeleResponseForm({ ...teleResponseForm, conduct: v })} />
+                <TextArea label="Coordenação do cuidado" value={teleResponseForm.care_coordination} onChange={(v) => setTeleResponseForm({ ...teleResponseForm, care_coordination: v })} />
+                <TextArea label="Referências" value={teleResponseForm.references} onChange={(v) => setTeleResponseForm({ ...teleResponseForm, references: v })} />
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={teleResponseForm.marked_as_suspected}
+                    onChange={(e) =>
+                      setTeleResponseForm({
+                        ...teleResponseForm,
+                        marked_as_suspected: e.target.checked,
+                      })
+                    }
+                  />
+                  Marcar como suspeito
+                </label>
+                <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">
+                  Enviar resposta
+                </button>
+              </form>
+            </SectionCard>
           </div>
-        </aside>
+        )}
 
-        <main className="flex-1 p-4 md:p-8">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-5">
-              <h1 className="text-3xl font-bold text-slate-900">
-                {menuItems.find((item) => item.key === activeScreen)?.label}
-              </h1>
-            </div>
+        {screen === "telerregulador" && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SectionCard title="Casos do telerregulador">
+              <button onClick={handleLoadRegulatorCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
+                Atualizar casos suspeitos
+              </button>
 
-            {renderScreen()}
+              <div className="space-y-3">
+                {regulatorCases.map((item) => (
+                  <div key={item.id} className="border border-slate-200 rounded-xl p-4">
+                    <div className="font-semibold">Caso #{item.id} — {item.patient_name}</div>
+                    <div className="text-sm text-slate-600">Estado: {item.state}</div>
+                    <div className="text-sm text-slate-600">Status: {item.status}</div>
+                    <div className="text-sm text-slate-600">Suspeito: {String(item.is_suspected)}</div>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Criar / editar seguimento">
+              <div className="space-y-4">
+                <Input label="ID do caso" value={selectedFollowupCaseId} onChange={setSelectedFollowupCaseId} />
+                <Input label="ID do followup para editar" value={followupIdToEdit} onChange={setFollowupIdToEdit} />
+                <Input label="Data do laudo microscópico" value={followupForm.microscopic_report_date} onChange={(v) => setFollowupForm({ ...followupForm, microscopic_report_date: v })} type="date" />
+                <Input label="Consulta cabeça e pescoço / oncologia" value={followupForm.head_neck_or_oncology_visit_date} onChange={(v) => setFollowupForm({ ...followupForm, head_neck_or_oncology_visit_date: v })} type="date" />
+                <Input label="Início do tratamento" value={followupForm.treatment_start_date} onChange={(v) => setFollowupForm({ ...followupForm, treatment_start_date: v })} type="date" />
+                <Input label="Acompanhamento 3 meses" value={followupForm.followup_3m_date} onChange={(v) => setFollowupForm({ ...followupForm, followup_3m_date: v })} type="date" />
+                <Input label="Acompanhamento 6 meses" value={followupForm.followup_6m_date} onChange={(v) => setFollowupForm({ ...followupForm, followup_6m_date: v })} type="date" />
+                <TextArea label="Tratamentos realizados" value={followupForm.treatments_done} onChange={(v) => setFollowupForm({ ...followupForm, treatments_done: v })} />
+                <TextArea label="Situação clínica" value={followupForm.clinical_status} onChange={(v) => setFollowupForm({ ...followupForm, clinical_status: v })} />
+                <TextArea label="Observações" value={followupForm.notes} onChange={(v) => setFollowupForm({ ...followupForm, notes: v })} />
+
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={handleLoadFollowups} className="px-4 py-2 rounded-xl border border-slate-300">
+                    Ver seguimentos
+                  </button>
+                  <button onClick={handleCreateFollowup} className="px-4 py-2 rounded-xl bg-emerald-600 text-white">
+                    Criar seguimento
+                  </button>
+                  <button onClick={handleUpdateFollowup} className="px-4 py-2 rounded-xl bg-blue-600 text-white">
+                    Editar seguimento
+                  </button>
+                </div>
+
+                {followups.length > 0 && (
+                  <pre className="bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto text-xs">
+                    {JSON.stringify(followups, null, 2)}
+                  </pre>
+                )}
+              </div>
+            </SectionCard>
           </div>
-        </main>
+        )}
       </div>
     </div>
   );

@@ -1,8 +1,13 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional, List
+
+from pydantic import BaseModel, Field
 
 from app.models.case import CaseStatus
+from app.schemas.message import CaseMessageOut
+from app.schemas.response import TeleconsultResponseOut
+from app.schemas.followup import RegulatorFollowUpOut
+from app.schemas.case_media import CaseMediaOut
 
 
 class CaseCreate(BaseModel):
@@ -57,3 +62,11 @@ class CaseOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class CaseDetailOut(BaseModel):
+    case: CaseOut
+    response: Optional[TeleconsultResponseOut] = None
+    media: List[CaseMediaOut] = Field(default_factory=list)
+    messages: List[CaseMessageOut] = Field(default_factory=list)
+    followups: List[RegulatorFollowUpOut] = Field(default_factory=list)
