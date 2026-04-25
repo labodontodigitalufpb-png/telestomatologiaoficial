@@ -128,6 +128,8 @@ const specialtyOptions = [
 
 const professionalCouncilOptions = ["TSB", "ACD", "Enfermeiro", "Médico", "Cirurgião Dentista"];
 
+const assetPath = (filename: string) => `${import.meta.env.BASE_URL}${filename}`;
+
 const valuationOptions = {
   objectives: [
     "Necessidade de orientação para o diagnóstico",
@@ -1114,19 +1116,19 @@ export default function App() {
                 <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <img
-                      src="/logo-teleestomatologia.jpg"
+                      src={assetPath("logo-teleestomatologia.jpg")}
                       alt="Telestomatologia"
                       className="w-full aspect-square object-cover rounded-xl border border-slate-200"
                     />
                     <img
-                      src="/labodigit.jpeg"
+                      src={assetPath("labodigit.jpeg")}
                       alt="LABODIGIT - Laboratório de Odontologia Digital"
                       className="w-full aspect-square object-cover rounded-xl border border-slate-200"
                     />
                   </div>
                   <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
                     <img
-                      src="/brasil-sorridente-logo.jpg"
+                      src={assetPath("brasil-sorridente-logo.jpg")}
                       alt="Brasil Sorridente - Saúde Bucal no SUS"
                       className="mx-auto max-h-28 w-full object-contain"
                     />
