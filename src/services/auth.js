@@ -1,5 +1,18 @@
 import { API_BASE_URL, setToken, removeToken, getToken } from "./api";
 
+function decodeJwt(token) {
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length < 2) return null;
+  try {
+    const payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const normalized = payload.padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return JSON.parse(atob(normalized));
+  } catch {
+    return null;
+  }
+}
+
 export async function login(email, password) {
   const formData = new URLSearchParams();
   formData.append("username", email);
@@ -78,4 +91,9 @@ export function isAuthenticated() {
 
 export function getAuthToken() {
   return getToken();
+}
+
+export function getCurrentUserRole() {
+  const payload = decodeJwt(getToken());
+  return payload?.role || null;
 }

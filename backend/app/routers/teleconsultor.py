@@ -94,7 +94,6 @@ def respond_case(
 
     if response_data.marked_as_suspected:
         case.is_suspected = True
-        case.sent_to_regulator = True
         case.status = CaseStatus.SUSPECTED
 
     db.add(case)
@@ -148,7 +147,6 @@ def update_response(
 
     if response_data.marked_as_suspected:
         case.is_suspected = True
-        case.sent_to_regulator = True
         case.status = CaseStatus.SUSPECTED
 
     db.add(response)
@@ -165,7 +163,7 @@ def get_case_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in [UserRole.TELECONSULTOR, UserRole.PROFESSIONAL, UserRole.TELERREGULADOR, UserRole.ADMIN]:
+    if current_user.role not in [UserRole.TELECONSULTOR, UserRole.PROFESSIONAL, UserRole.TELERREGULADOR, UserRole.PATOLOGISTA, UserRole.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem permissão para acessar esta resposta."
@@ -193,7 +191,7 @@ def get_case_response(
 
     if (
         current_user.role == UserRole.TELERREGULADOR
-        and not (case.is_suspected and case.sent_to_regulator and case.state == current_user.state)
+        and not (case.is_suspected and case.sent_to_regulator)
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -8,6 +8,7 @@ from app.core.database import Base
 class UserRole(str, enum.Enum):
     PROFESSIONAL = "PROFESSIONAL"
     TELECONSULTOR = "TELECONSULTOR"
+    PATOLOGISTA = "PATOLOGISTA"
     TELERREGULADOR = "TELERREGULADOR"
     ADMIN = "ADMIN"
 
@@ -24,6 +25,10 @@ class User(Base):
 
     age = Column(Integer, nullable=True)
     sex = Column(String, nullable=True)
+    race_color = Column(String, nullable=True)
+    schooling = Column(String, nullable=True)
+    patient_phone = Column(String, nullable=True)
+    sus_card = Column(String, nullable=True)
     municipality = Column(String, nullable=True)
     state = Column(String, nullable=True)
     address = Column(String, nullable=True)

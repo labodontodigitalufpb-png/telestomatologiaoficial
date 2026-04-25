@@ -9,7 +9,6 @@ def assign_case_to_teleconsultor(db: Session, case: ClinicalCase):
         db.query(User)
         .filter(
             User.role == UserRole.TELECONSULTOR,
-            User.state == case.state,
             User.is_active == True
         )
         .order_by(User.id.asc())

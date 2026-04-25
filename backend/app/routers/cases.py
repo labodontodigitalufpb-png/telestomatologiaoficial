@@ -12,6 +12,7 @@ from app.models.case_media import CaseMedia, CaseMediaType
 from app.models.message import CaseMessage
 from app.models.response import TeleconsultResponse
 from app.models.followup import RegulatorFollowUp
+from app.models.pathology_report import PathologyReport
 from app.models.user import User, UserRole
 from app.schemas.case import CaseCreate, CaseOut, CaseDetailOut
 from app.schemas.case_media import CaseMediaOut
@@ -40,6 +41,8 @@ def create_case(
         patient_name=case_data.patient_name,
         patient_age=case_data.patient_age,
         patient_sex=case_data.patient_sex,
+        race_color=case_data.race_color,
+        schooling=case_data.schooling,
         patient_phone=case_data.patient_phone,
         sus_card=case_data.sus_card,
         health_unit=case_data.health_unit,
@@ -51,8 +54,26 @@ def create_case(
         dental_history=case_data.dental_history,
         medications=case_data.medications,
         extraoral_exam=case_data.extraoral_exam,
+        lymphadenopathy=case_data.lymphadenopathy,
         lesion_description=case_data.lesion_description,
         diagnostic_hypothesis=case_data.diagnostic_hypothesis,
+        specialist_status=case_data.specialist_status,
+        specialties=case_data.specialties,
+        objectives=case_data.objectives,
+        skin_colors=case_data.skin_colors,
+        anatomical_locations=case_data.anatomical_locations,
+        fundamental_lesions=case_data.fundamental_lesions,
+        habits_and_addictions=case_data.habits_and_addictions,
+        lesion_sides=case_data.lesion_sides,
+        lesion_colors=case_data.lesion_colors,
+        lesion_insertions=case_data.lesion_insertions,
+        lesion_sizes=case_data.lesion_sizes,
+        lesion_surfaces=case_data.lesion_surfaces,
+        lesion_consistencies=case_data.lesion_consistencies,
+        lesion_symptomatologies=case_data.lesion_symptomatologies,
+        pre_existing_conditions=case_data.pre_existing_conditions,
+        image_quality=case_data.image_quality,
+        care_units=case_data.care_units,
         status=CaseStatus.DRAFT,
         is_suspected=False,
         sent_to_regulator=False,
@@ -112,8 +133,9 @@ def get_case(
         current_user.role == UserRole.TELERREGULADOR
         and case.is_suspected
         and case.sent_to_regulator
-        and case.state == current_user.state
     ):
+        allowed = True
+    elif current_user.role == UserRole.PATOLOGISTA:
         allowed = True
 
     if not allowed:
@@ -180,7 +202,7 @@ def submit_case(
 
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nenhum teleconsultor ativo foi encontrado para o estado {case.state}."
+            detail="Nenhum teleconsultor ativo foi encontrado."
         )
 
     db.refresh(case)
@@ -270,8 +292,9 @@ def list_case_media(
         current_user.role == UserRole.TELERREGULADOR
         and case.is_suspected
         and case.sent_to_regulator
-        and case.state == current_user.state
     ):
+        allowed = True
+    elif current_user.role == UserRole.PATOLOGISTA:
         allowed = True
 
     if not allowed:
@@ -316,8 +339,9 @@ def get_case_detail(
         current_user.role == UserRole.TELERREGULADOR
         and case.is_suspected
         and case.sent_to_regulator
-        and case.state == current_user.state
     ):
+        allowed = True
+    elif current_user.role == UserRole.PATOLOGISTA:
         allowed = True
 
     if not allowed:
@@ -329,6 +353,11 @@ def get_case_detail(
     response = (
         db.query(TeleconsultResponse)
         .filter(TeleconsultResponse.case_id == case_id)
+        .first()
+    )
+    pathology_report = (
+        db.query(PathologyReport)
+        .filter(PathologyReport.case_id == case_id)
         .first()
     )
 
@@ -356,6 +385,7 @@ def get_case_detail(
     return {
         "case": case,
         "response": response,
+        "pathology_report": pathology_report,
         "media": media,
         "messages": messages,
         "followups": followups,

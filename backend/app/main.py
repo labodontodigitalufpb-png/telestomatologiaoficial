@@ -5,6 +5,7 @@ from app.routers.auth import router as auth_router
 from app.routers.cases import router as cases_router
 from app.routers.chat import router as chat_router
 from app.routers.dashboard import router as dashboard_router
+from app.routers.patologista import router as patologista_router
 from app.routers.teleconsultor import router as teleconsultor_router
 from app.routers.telerregulador import router as telerregulador_router
 
@@ -29,6 +30,7 @@ app.include_router(auth_router)
 app.include_router(cases_router)
 app.include_router(chat_router)
 app.include_router(teleconsultor_router)
+app.include_router(patologista_router)
 app.include_router(telerregulador_router)
 app.include_router(dashboard_router)
 

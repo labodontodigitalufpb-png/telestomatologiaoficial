@@ -30,7 +30,6 @@ def list_suspected_cases(
         .filter(
             ClinicalCase.is_suspected == True,
             ClinicalCase.sent_to_regulator == True,
-            ClinicalCase.state == current_user.state
         )
         .order_by(ClinicalCase.created_at.desc())
         .all()
@@ -58,7 +57,6 @@ def create_followup(
             ClinicalCase.id == case_id,
             ClinicalCase.is_suspected == True,
             ClinicalCase.sent_to_regulator == True,
-            ClinicalCase.state == current_user.state
         )
         .first()
     )
@@ -75,8 +73,18 @@ def create_followup(
         microscopic_report_date=followup_data.microscopic_report_date,
         head_neck_or_oncology_visit_date=followup_data.head_neck_or_oncology_visit_date,
         treatment_start_date=followup_data.treatment_start_date,
+        followup_1m_date=followup_data.followup_1m_date,
         followup_3m_date=followup_data.followup_3m_date,
         followup_6m_date=followup_data.followup_6m_date,
+        followup_12m_date=followup_data.followup_12m_date,
+        followup_1m_actions=followup_data.followup_1m_actions,
+        followup_3m_actions=followup_data.followup_3m_actions,
+        followup_6m_actions=followup_data.followup_6m_actions,
+        followup_12m_actions=followup_data.followup_12m_actions,
+        followup_1m_barriers=followup_data.followup_1m_barriers,
+        followup_3m_barriers=followup_data.followup_3m_barriers,
+        followup_6m_barriers=followup_data.followup_6m_barriers,
+        followup_12m_barriers=followup_data.followup_12m_barriers,
         treatments_done=followup_data.treatments_done,
         clinical_status=followup_data.clinical_status,
         notes=followup_data.notes,
@@ -111,7 +119,8 @@ def update_followup(
         .join(ClinicalCase, ClinicalCase.id == RegulatorFollowUp.case_id)
         .filter(
             RegulatorFollowUp.id == followup_id,
-            ClinicalCase.state == current_user.state
+            ClinicalCase.is_suspected == True,
+            ClinicalCase.sent_to_regulator == True
         )
         .first()
     )
@@ -125,8 +134,18 @@ def update_followup(
     followup.microscopic_report_date = followup_data.microscopic_report_date
     followup.head_neck_or_oncology_visit_date = followup_data.head_neck_or_oncology_visit_date
     followup.treatment_start_date = followup_data.treatment_start_date
+    followup.followup_1m_date = followup_data.followup_1m_date
     followup.followup_3m_date = followup_data.followup_3m_date
     followup.followup_6m_date = followup_data.followup_6m_date
+    followup.followup_12m_date = followup_data.followup_12m_date
+    followup.followup_1m_actions = followup_data.followup_1m_actions
+    followup.followup_3m_actions = followup_data.followup_3m_actions
+    followup.followup_6m_actions = followup_data.followup_6m_actions
+    followup.followup_12m_actions = followup_data.followup_12m_actions
+    followup.followup_1m_barriers = followup_data.followup_1m_barriers
+    followup.followup_3m_barriers = followup_data.followup_3m_barriers
+    followup.followup_6m_barriers = followup_data.followup_6m_barriers
+    followup.followup_12m_barriers = followup_data.followup_12m_barriers
     followup.treatments_done = followup_data.treatments_done
     followup.clinical_status = followup_data.clinical_status
     followup.notes = followup_data.notes
@@ -154,7 +173,8 @@ def list_followups(
         db.query(ClinicalCase)
         .filter(
             ClinicalCase.id == case_id,
-            ClinicalCase.state == current_user.state
+            ClinicalCase.is_suspected == True,
+            ClinicalCase.sent_to_regulator == True
         )
         .first()
     )

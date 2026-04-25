@@ -19,6 +19,7 @@ def ensure_dashboard_access(current_user: User):
     if current_user.role not in [
         UserRole.ADMIN,
         UserRole.TELECONSULTOR,
+        UserRole.PATOLOGISTA,
         UserRole.TELERREGULADOR,
         UserRole.PROFESSIONAL,
     ]:

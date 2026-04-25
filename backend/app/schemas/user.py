@@ -6,13 +6,17 @@ from app.models.user import UserRole
 
 class UserCreate(BaseModel):
     full_name: str
-    email: EmailStr
-    password: str = Field(..., min_length=6, max_length=72)
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(default=None, min_length=6, max_length=72)
 
     role: UserRole
 
     age: Optional[int] = None
     sex: Optional[str] = None
+    race_color: Optional[str] = None
+    schooling: Optional[str] = None
+    patient_phone: Optional[str] = None
+    sus_card: Optional[str] = None
     municipality: Optional[str] = None
     state: Optional[str] = None
     address: Optional[str] = None
@@ -29,6 +33,10 @@ class UserOut(BaseModel):
     role: UserRole
     age: Optional[int] = None
     sex: Optional[str] = None
+    race_color: Optional[str] = None
+    schooling: Optional[str] = None
+    patient_phone: Optional[str] = None
+    sus_card: Optional[str] = None
     municipality: Optional[str] = None
     state: Optional[str] = None
     address: Optional[str] = None

@@ -1,1 +1,1 @@
-from . import auth, cases, teleconsultor, telerregulador, chat, dashboard
+from . import auth, cases, teleconsultor, telerregulador, patologista, chat, dashboard

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -14,8 +14,19 @@ class RegulatorFollowUp(Base):
     microscopic_report_date = Column(Date, nullable=True)
     head_neck_or_oncology_visit_date = Column(Date, nullable=True)
     treatment_start_date = Column(Date, nullable=True)
+    followup_1m_date = Column(Date, nullable=True)
     followup_3m_date = Column(Date, nullable=True)
     followup_6m_date = Column(Date, nullable=True)
+    followup_12m_date = Column(Date, nullable=True)
+
+    followup_1m_actions = Column(JSON, default=list, nullable=True)
+    followup_3m_actions = Column(JSON, default=list, nullable=True)
+    followup_6m_actions = Column(JSON, default=list, nullable=True)
+    followup_12m_actions = Column(JSON, default=list, nullable=True)
+    followup_1m_barriers = Column(JSON, default=list, nullable=True)
+    followup_3m_barriers = Column(JSON, default=list, nullable=True)
+    followup_6m_barriers = Column(JSON, default=list, nullable=True)
+    followup_12m_barriers = Column(JSON, default=list, nullable=True)
 
     treatments_done = Column(Text, nullable=True)
     clinical_status = Column(String, nullable=True)

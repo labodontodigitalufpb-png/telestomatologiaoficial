@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -13,7 +15,10 @@ router = APIRouter()
 
 @router.post("/register", response_model=UserOut)
 def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    email = user_data.email or f"usuario-{uuid4().hex}@teleestomato.local"
+    password = user_data.password or uuid4().hex
+
+    existing_user = db.query(User).filter(User.email == email).first()
 
     if existing_user:
         raise HTTPException(
@@ -22,7 +27,7 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
         )
 
     try:
-        hashed_password = hash_password(user_data.password)
+        hashed_password = hash_password(password)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -31,11 +36,15 @@ def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
 
     new_user = User(
         full_name=user_data.full_name,
-        email=user_data.email,
+        email=email,
         password_hash=hashed_password,
         role=user_data.role,
         age=user_data.age,
         sex=user_data.sex,
+        race_color=user_data.race_color,
+        schooling=user_data.schooling,
+        patient_phone=user_data.patient_phone,
+        sus_card=user_data.sus_card,
         municipality=user_data.municipality,
         state=user_data.state,
         address=user_data.address,

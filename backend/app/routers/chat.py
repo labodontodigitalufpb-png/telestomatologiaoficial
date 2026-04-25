@@ -32,8 +32,10 @@ def user_can_access_case(current_user: User, case: ClinicalCase) -> bool:
         current_user.role == UserRole.TELERREGULADOR
         and case.is_suspected
         and case.sent_to_regulator
-        and case.state == current_user.state
     ):
+        return True
+
+    if current_user.role == UserRole.PATOLOGISTA:
         return True
 
     return False
