@@ -1,5 +1,19 @@
 # React + TypeScript + Vite
 
+## GitHub Pages
+
+O frontend pode ser publicado no GitHub Pages pelo workflow em `.github/workflows/pages.yml`.
+
+Antes de usar em produção, configure no GitHub a variável do repositório:
+
+```text
+VITE_API_BASE_URL=https://url-do-backend
+```
+
+No GitHub: `Settings` > `Secrets and variables` > `Actions` > `Variables`.
+
+O backend FastAPI e o PostgreSQL precisam estar hospedados separadamente. O GitHub Pages publica apenas o frontend.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
