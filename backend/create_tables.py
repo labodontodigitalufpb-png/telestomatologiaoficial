@@ -55,11 +55,48 @@ PATHOLOGY_REPORT_BOOLEAN_COLUMNS = [
     "malignant_neoplasm",
 ]
 
+POSTGRES_ENUM_VALUES = {
+    "userrole": [
+        "PROFESSIONAL",
+        "TELECONSULTOR",
+        "PATOLOGISTA",
+        "TELERREGULADOR",
+        "ADMIN",
+    ],
+    "casestatus": [
+        "DRAFT",
+        "SUBMITTED",
+        "ASSIGNED",
+        "ANSWERED",
+        "SUSPECTED",
+        "IN_FOLLOWUP",
+        "CLOSED",
+    ],
+    "casemediatype": [
+        "IMAGE",
+        "EXAM",
+        "CONSENT",
+        "AUDIO",
+        "VIDEO",
+    ],
+    "messagetype": [
+        "TEXT",
+        "IMAGE",
+        "AUDIO",
+        "VIDEO",
+    ],
+}
+
 print("Criando tabelas...")
 Base.metadata.create_all(bind=engine)
 
 if engine.dialect.name == "postgresql":
     with engine.begin() as connection:
+        for enum_name, values in POSTGRES_ENUM_VALUES.items():
+            for value in values:
+                connection.execute(
+                    text(f"ALTER TYPE {enum_name} ADD VALUE IF NOT EXISTS '{value}'")
+                )
         for column in CASE_VALUATION_COLUMNS:
             connection.execute(
                 text(f"ALTER TABLE clinical_cases ADD COLUMN IF NOT EXISTS {column} JSON")

@@ -21,12 +21,12 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-app.include_router(cases_router)
-app.include_router(chat_router)
-app.include_router(teleconsultor_router)
+app.include_router(cases_router, prefix="/cases")
+app.include_router(chat_router, prefix="/chat")
+app.include_router(teleconsultor_router, prefix="/teleconsultor")
 app.include_router(patologista_router)
-app.include_router(telerregulador_router)
-app.include_router(dashboard_router)
+app.include_router(telerregulador_router, prefix="/telerregulador")
+app.include_router(dashboard_router, prefix="/dashboard")
 
 
 @app.get("/")
