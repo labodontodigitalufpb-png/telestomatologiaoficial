@@ -1,87 +1,128 @@
-# React + TypeScript + Vite
+# TeleEstomato App
 
-## GitHub Pages
+Aplicacao web para apoio ao fluxo de telessaude em estomatologia, com frontend em React/Vite e backend em FastAPI.
 
-O frontend pode ser publicado no GitHub Pages pelo workflow em `.github/workflows/pages.yml`.
+Este README evita expor credenciais, dados clinicos, dados pessoais, enderecos internos e detalhes sensiveis de infraestrutura. Use sempre valores locais ou de ambiente para configuracao.
 
-Antes de usar em produção, configure no GitHub a variável do repositório:
+## Visao Geral
+
+- Frontend: React, TypeScript, Vite e Tailwind CSS.
+- Backend: FastAPI, SQLAlchemy e PostgreSQL.
+- Banco local: PostgreSQL via Docker Compose.
+- Deploy do frontend: GitHub Pages via `.github/workflows/pages.yml`.
+- Deploy do backend e banco: deve ser feito separadamente em ambiente proprio.
+
+## Requisitos
+
+- Node.js 22 ou versao compativel com o projeto.
+- npm.
+- Python 3.9 ou superior.
+- Docker e Docker Compose para o PostgreSQL local.
+
+## Configuracao
+
+Crie o arquivo de ambiente do backend a partir do exemplo:
+
+```bash
+cp backend/.env.example backend/.env
+```
+
+Edite `backend/.env` com os valores do seu ambiente. Nao publique esse arquivo e nao reutilize chaves de desenvolvimento em producao.
+
+Variaveis esperadas:
 
 ```text
-VITE_API_BASE_URL=https://url-do-backend
+APP_NAME
+DATABASE_URL
+SECRET_KEY
+ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES
+FRONTEND_ORIGINS
+```
+
+Para o frontend, a API e definida por:
+
+```text
+VITE_API_BASE_URL
+```
+
+Sem essa variavel, o frontend usa a API local em `http://127.0.0.1:8000`.
+
+## Execucao Local
+
+Instale as dependencias do frontend:
+
+```bash
+npm install
+```
+
+Suba o banco local:
+
+```bash
+cd backend
+docker compose up -d
+```
+
+Crie e ative um ambiente virtual Python:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Instale as dependencias do backend:
+
+```bash
+pip install -r requirements.txt
+```
+
+Crie ou atualize as tabelas:
+
+```bash
+python create_tables.py
+```
+
+Inicie a API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Em outro terminal, inicie o frontend na raiz do projeto:
+
+```bash
+npm run dev
+```
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
+
+## Deploy no GitHub Pages
+
+O workflow em `.github/workflows/pages.yml` publica apenas o frontend. Antes de usar em producao, configure a variavel do repositorio:
+
+```text
+VITE_API_BASE_URL=https://url-publica-do-backend
 ```
 
 No GitHub: `Settings` > `Secrets and variables` > `Actions` > `Variables`.
 
-O backend FastAPI e o PostgreSQL precisam estar hospedados separadamente. O GitHub Pages publica apenas o frontend.
+O backend FastAPI, o PostgreSQL e o armazenamento de uploads precisam estar hospedados separadamente.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Cuidados de Seguranca
 
-Currently, two official plugins are available:
+- Nao versionar `.env`, bancos locais, uploads, arquivos de pacientes ou ambientes virtuais.
+- Usar uma `SECRET_KEY` forte e exclusiva por ambiente.
+- Manter `FRONTEND_ORIGINS` restrito aos dominios realmente usados.
+- Nao incluir dados pessoais, dados clinicos, imagens, exames ou exemplos reais na documentacao.
+- Revisar permissoes e armazenamento de uploads antes de publicar o backend.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Observacoes Para Desenvolvimento
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+O diretorio `uploads/` e usado pelo backend para arquivos enviados em casos, chat e laudos. Em producao, avalie armazenamento persistente, backup, controle de acesso e politicas de retencao adequadas ao tipo de dado tratado.
