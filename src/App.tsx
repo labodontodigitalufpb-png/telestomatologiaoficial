@@ -1214,15 +1214,15 @@ export default function App() {
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <div className="mx-auto max-w-7xl space-y-5 p-3 sm:p-4 md:p-8 md:space-y-6">
         <div className="sticky top-0 z-20 -mx-3 border-b border-slate-200 bg-white/95 px-3 py-4 shadow-sm backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:p-5 md:static md:flex md:flex-col md:gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                 {screenMeta[screen].title}
               </p>
               <h1 className="text-xl font-bold sm:text-2xl">Telestomatologia no SUS</h1>
-            <p className="text-sm text-slate-600">
-              Prática de apoio para envio e teleconsultoria de casos de doenças da boca.
-            </p>
+              <p className="text-sm text-slate-600">
+                Prática de apoio para envio e teleconsultoria de casos de doenças da boca.
+              </p>
             </div>
 
             <button
@@ -1231,7 +1231,7 @@ export default function App() {
                 changeScreen("login");
                 showSuccess("Logout realizado.");
               }}
-              className="min-h-11 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 active:scale-[0.99]"
+              className="min-h-10 shrink-0 rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 active:scale-[0.99] sm:min-h-11 sm:px-4"
             >
               Sair
             </button>
