@@ -5,8 +5,9 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.admin import is_authorized_admin_email
 from app.core.security import hash_password, verify_password, create_access_token
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserOut
 from app.schemas.auth import Token
 
@@ -17,6 +18,12 @@ router = APIRouter()
 def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     email = user_data.email or f"usuario-{uuid4().hex}@teleestomato.local"
     password = user_data.password or uuid4().hex
+
+    if user_data.role == UserRole.ADMIN and not is_authorized_admin_email(email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cadastro de administrador geral não autorizado."
+        )
 
     existing_user = db.query(User).filter(User.email == email).first()
 
@@ -78,6 +85,12 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Credenciais inválidas."
+        )
+
+    if user.role == UserRole.ADMIN and not is_authorized_admin_email(user.email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrador geral não autorizado."
         )
 
     access_token = create_access_token(

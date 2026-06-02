@@ -104,3 +104,41 @@ export async function apiPostForm(path, formData) {
     body: formData,
   });
 }
+
+export async function downloadFile(path, filename) {
+  const token = getToken();
+  const headers = {};
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  let response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { headers });
+  } catch (error) {
+    throw new Error("Não foi possível conectar ao backend. Verifique se a API está ligada.");
+  }
+
+  if (!response.ok) {
+    let errorMessage = "Erro ao baixar arquivo";
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.detail || errorData.message || errorMessage;
+    } catch {
+      errorMessage = response.statusText || errorMessage;
+    }
+    throw new Error(errorMessage);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
+}

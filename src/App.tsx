@@ -3,7 +3,9 @@ import { getCurrentUserRole, login, logout } from "./services/auth";
 import { registerUser } from "./services/users";
 import {
   createCase,
+  exportCasesCsv,
   getCaseDetail,
+  listAllCases,
   listMyCases,
   submitCase,
   uploadCaseMedia,
@@ -38,6 +40,7 @@ type Screen =
   | "patologista"
   | "telerregulador"
   | "acompanhador"
+  | "admin"
   | "dashboard";
 
 type MessageState = {
@@ -140,6 +143,7 @@ const screenMeta: Record<Screen, { label: string; title: string }> = {
   patologista: { label: "Patologista", title: "Patologia" },
   telerregulador: { label: "Telerregulador", title: "Telerregulação" },
   acompanhador: { label: "Acompanhador Municipal", title: "Acompanhamento Municipal" },
+  admin: { label: "Administrador Geral", title: "Administração Geral" },
   dashboard: { label: "Dashboard", title: "Indicadores" },
 };
 
@@ -151,6 +155,7 @@ const navItems: Array<{ screen: Screen; label: string }> = [
   { screen: "patologista", label: screenMeta.patologista.label },
   { screen: "telerregulador", label: screenMeta.telerregulador.label },
   { screen: "acompanhador", label: screenMeta.acompanhador.label },
+  { screen: "admin", label: screenMeta.admin.label },
   { screen: "dashboard", label: screenMeta.dashboard.label },
 ];
 
@@ -703,17 +708,20 @@ export default function App() {
   const [pathologistCases, setPathologistCases] = useState<any[]>([]);
   const [regulatorCases, setRegulatorCases] = useState<any[]>([]);
   const [municipalCases, setMunicipalCases] = useState<any[]>([]);
+  const [adminCases, setAdminCases] = useState<any[]>([]);
 
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [selectedResponseCaseId, setSelectedResponseCaseId] = useState<string>("");
   const [selectedPathologistCaseId, setSelectedPathologistCaseId] = useState<string>("");
   const [selectedFollowupCaseId, setSelectedFollowupCaseId] = useState<string>("");
   const [selectedMunicipalCaseId, setSelectedMunicipalCaseId] = useState<string>("");
+  const [selectedAdminCaseId, setSelectedAdminCaseId] = useState<string>("");
   const [caseDetail, setCaseDetail] = useState<any>(null);
   const [teleCaseDetail, setTeleCaseDetail] = useState<any>(null);
   const [pathologistCaseDetail, setPathologistCaseDetail] = useState<any>(null);
   const [regulatorCaseDetail, setRegulatorCaseDetail] = useState<any>(null);
   const [municipalCaseDetail, setMunicipalCaseDetail] = useState<any>(null);
+  const [adminCaseDetail, setAdminCaseDetail] = useState<any>(null);
   const [followups, setFollowups] = useState<any[]>([]);
   const [followupIdToEdit, setFollowupIdToEdit] = useState<string>("");
 
@@ -764,6 +772,7 @@ export default function App() {
     else if (role === "PATOLOGISTA") changeScreen("patologista");
     else if (role === "TELERREGULADOR") changeScreen("telerregulador");
     else if (role === "ACOMPANHADOR_MUNICIPAL") changeScreen("acompanhador");
+    else if (role === "ADMIN") changeScreen("admin");
     else changeScreen("profissional");
   }
 
@@ -1006,6 +1015,30 @@ export default function App() {
     }
   }
 
+  async function handleLoadAdminCases() {
+    clearMessage();
+    try {
+      const data = await listAllCases();
+      setAdminCases(data);
+      showSuccess("Todos os casos foram carregados.");
+    } catch (error: any) {
+      setAdminCases([]);
+      showError(error.message);
+    }
+  }
+
+  async function handleSelectAdminCase(caseId: number) {
+    clearMessage();
+    try {
+      const data = await getCaseDetail(caseId);
+      setSelectedAdminCaseId(String(caseId));
+      setAdminCaseDetail(data);
+      showSuccess("Detalhes do caso carregados para administração.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
   async function handleSelectRegulatorCase(caseId: number) {
     clearMessage();
     try {
@@ -1119,6 +1152,16 @@ export default function App() {
     }
   }
 
+  async function handleExportCasesCsv() {
+    clearMessage();
+    try {
+      await exportCasesCsv();
+      showSuccess("Planilha de casos baixada com sucesso.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
   useEffect(() => {
     setCaseDetail(null);
   }, [selectedCaseId]);
@@ -1130,6 +1173,10 @@ export default function App() {
   useEffect(() => {
     setMunicipalCaseDetail(null);
   }, [selectedMunicipalCaseId]);
+
+  useEffect(() => {
+    setAdminCaseDetail(null);
+  }, [selectedAdminCaseId]);
 
   useEffect(() => {
     document.title = `${screenMeta[screen].title} | Telestomatologia no SUS`;
@@ -1151,6 +1198,11 @@ export default function App() {
         : "border border-slate-300 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50",
     ].join(" ");
   }
+
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.screen !== "admin") return true;
+    return getCurrentUserRole() === "ADMIN";
+  });
 
   const showCaseChat =
     screen === "profissional" ||
@@ -1187,7 +1239,7 @@ export default function App() {
 
           <nav className="-mx-1 overflow-x-auto px-1 pb-1" aria-label="Navegação principal">
             <div className="flex min-w-max gap-2 md:flex-wrap">
-              {navItems.map((item) => (
+              {visibleNavItems.map((item) => (
                 <button
                   key={item.screen}
                   type="button"
@@ -1405,9 +1457,12 @@ export default function App() {
             </SectionCard>
 
             <SectionCard title="Meus casos">
-              <div className="flex gap-2 mb-4">
+              <div className="flex flex-wrap gap-2 mb-4">
                 <button onClick={handleLoadMyCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
                   Atualizar lista
+                </button>
+                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Baixar planilha
                 </button>
               </div>
 
@@ -1445,9 +1500,14 @@ export default function App() {
         {screen === "teleconsultor" && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <SectionCard title="Casos do teleconsultor">
-              <button onClick={handleLoadTeleCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
-                Atualizar casos atribuídos
-              </button>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button onClick={handleLoadTeleCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar casos atribuídos
+                </button>
+                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Baixar planilha
+                </button>
+              </div>
 
               <div className="space-y-3">
                 {teleCases.map((item) => (
@@ -1491,9 +1551,14 @@ export default function App() {
         {screen === "patologista" && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <SectionCard title="Casos para patologista">
-              <button onClick={handleLoadPathologistCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
-                Atualizar casos
-              </button>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button onClick={handleLoadPathologistCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar casos
+                </button>
+                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Baixar planilha
+                </button>
+              </div>
 
               <div className="space-y-3">
                 {pathologistCases.map((item) => (
@@ -1543,9 +1608,14 @@ export default function App() {
         {screen === "telerregulador" && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <SectionCard title="Casos do telerregulador">
-              <button onClick={handleLoadRegulatorCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
-                Atualizar casos suspeitos
-              </button>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button onClick={handleLoadRegulatorCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar casos suspeitos
+                </button>
+                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Baixar planilha
+                </button>
+              </div>
 
               <div className="space-y-3">
                 {regulatorCases.map((item) => (
@@ -1612,9 +1682,14 @@ export default function App() {
         {screen === "acompanhador" && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <SectionCard title="Casos do município">
-              <button onClick={handleLoadMunicipalCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
-                Atualizar casos do município
-              </button>
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button onClick={handleLoadMunicipalCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar casos do município
+                </button>
+                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Baixar planilha
+                </button>
+              </div>
 
               <div className="space-y-3">
                 {municipalCases.length === 0 && (
@@ -1650,6 +1725,58 @@ export default function App() {
               ) : (
                 <p className="mt-4 text-sm text-slate-600">
                   Selecione um caso da lista para visualizar relato, resposta, laudo, arquivos e seguimentos.
+                </p>
+              )}
+            </SectionCard>
+          </div>
+        )}
+
+        {screen === "admin" && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SectionCard title="Todos os casos enviados">
+              <div className="flex flex-wrap gap-2 mb-4">
+                <button onClick={handleLoadAdminCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar todos os casos
+                </button>
+                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Baixar planilha geral
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {adminCases.length === 0 && (
+                  <p className="text-sm text-slate-600">
+                    Nenhum caso carregado. Atualize a lista para visualizar todos os casos enviados.
+                  </p>
+                )}
+
+                {adminCases.map((item) => (
+                  <div key={item.id} className="border border-slate-200 rounded-xl p-4">
+                    <div className="font-semibold">{caseIdentifier(item)}</div>
+                    <div className="text-sm text-slate-600">Data de envio: {displayDate(item.created_at)}</div>
+                    <div className="text-sm text-slate-600">Status: {item.status}</div>
+                    <div className="text-sm text-slate-600">Unidade: {item.health_unit || "Não informada"}</div>
+                    <button onClick={() => handleSelectAdminCase(item.id)} className="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">
+                      Ver detalhes
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Detalhe administrativo do caso">
+              <Input label="ID do caso" value={selectedAdminCaseId} onChange={setSelectedAdminCaseId} />
+              <div className="mt-3">
+                <button type="button" onClick={() => selectedAdminCaseId && handleSelectAdminCase(Number(selectedAdminCaseId))} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Ver detalhe completo
+                </button>
+              </div>
+
+              {adminCaseDetail ? (
+                <ProfessionalCaseDetail detail={adminCaseDetail} />
+              ) : (
+                <p className="mt-4 text-sm text-slate-600">
+                  Selecione um caso da lista para visualizar relato, resposta, laudo, arquivos, mensagens e seguimentos.
                 </p>
               )}
             </SectionCard>

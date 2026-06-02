@@ -1,4 +1,4 @@
-import { apiFetch, API_BASE_URL, getToken } from "./api";
+import { apiFetch, API_BASE_URL, getToken, downloadFile } from "./api";
 
 export async function createCase(payload) {
   return apiFetch("/cases/", {
@@ -11,6 +11,10 @@ export async function listMyCases() {
   return apiFetch("/cases/mine");
 }
 
+export async function listAllCases() {
+  return apiFetch("/cases/all");
+}
+
 export async function submitCase(caseId) {
   return apiFetch(`/cases/${caseId}/submit`, {
     method: "POST",
@@ -19,6 +23,10 @@ export async function submitCase(caseId) {
 
 export async function getCaseDetail(caseId) {
   return apiFetch(`/cases/${caseId}/detail`);
+}
+
+export async function exportCasesCsv() {
+  return downloadFile("/cases/export.csv", "casos-teleestomato.csv");
 }
 
 export async function uploadCaseMedia(caseId, mediaType, file) {

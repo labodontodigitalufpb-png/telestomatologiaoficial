@@ -1,8 +1,12 @@
 from typing import List
+import csv
+from io import StringIO
 from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi.responses import Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -56,6 +60,49 @@ def user_can_access_case(current_user: User, case: ClinicalCase) -> bool:
         return not user_state or user_state == case_state
 
     return False
+
+
+def query_accessible_cases(db: Session, current_user: User):
+    query = db.query(ClinicalCase)
+
+    if current_user.role == UserRole.ADMIN:
+        return query
+
+    if current_user.role == UserRole.PROFESSIONAL:
+        return query.filter(ClinicalCase.professional_id == current_user.id)
+
+    if current_user.role == UserRole.TELECONSULTOR:
+        return query.filter(ClinicalCase.assigned_teleconsultor_id == current_user.id)
+
+    if current_user.role == UserRole.TELERREGULADOR:
+        return query.filter(
+            ClinicalCase.is_suspected == True,
+            ClinicalCase.sent_to_regulator == True,
+        )
+
+    if current_user.role == UserRole.PATOLOGISTA:
+        return query
+
+    if current_user.role == UserRole.ACOMPANHADOR_MUNICIPAL:
+        municipality = (current_user.municipality or "").strip()
+        if not municipality:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Seu cadastro precisa ter um município definido.",
+            )
+
+        query = query.filter(func.lower(ClinicalCase.municipality) == municipality.lower())
+
+        state_value = (current_user.state or "").strip()
+        if state_value:
+            query = query.filter(func.lower(ClinicalCase.state) == state_value.lower())
+
+        return query
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Você não tem permissão para exportar casos.",
+    )
 
 
 @router.post("/", response_model=CaseOut)
@@ -139,6 +186,89 @@ def list_my_cases(
     )
 
     return cases
+
+
+@router.get("/all", response_model=List[CaseOut])
+def list_all_cases(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem visualizar todos os casos."
+        )
+
+    return (
+        db.query(ClinicalCase)
+        .order_by(ClinicalCase.created_at.desc())
+        .all()
+    )
+
+
+@router.get("/export.csv")
+def export_cases_csv(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    cases = (
+        query_accessible_cases(db, current_user)
+        .order_by(ClinicalCase.created_at.desc())
+        .all()
+    )
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id",
+        "data_envio",
+        "status",
+        "paciente",
+        "idade",
+        "sexo",
+        "municipio",
+        "estado",
+        "unidade",
+        "profissional_id",
+        "teleconsultor_id",
+        "suspeito",
+        "enviado_regulador",
+        "objetivos",
+        "localizacao_anatomica",
+        "lesao_fundamental",
+        "hipotese_diagnostica",
+        "queixa_principal",
+    ])
+
+    for case in cases:
+        writer.writerow([
+            case.id,
+            case.created_at.isoformat() if case.created_at else "",
+            case.status.value if case.status else "",
+            case.patient_name,
+            case.patient_age or "",
+            case.patient_sex or "",
+            case.municipality or "",
+            case.state or "",
+            case.health_unit or "",
+            case.professional_id,
+            case.assigned_teleconsultor_id or "",
+            "sim" if case.is_suspected else "nao",
+            "sim" if case.sent_to_regulator else "nao",
+            "; ".join(case.objectives or []),
+            "; ".join(case.anatomical_locations or []),
+            "; ".join(case.fundamental_lesions or []),
+            case.diagnostic_hypothesis or "",
+            case.chief_complaint or "",
+        ])
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="casos-teleestomato.csv"'
+        },
+    )
 
 
 @router.get("/{case_id}", response_model=CaseOut)

@@ -1,13 +1,13 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.case import ClinicalCase
 from app.models.user import User, UserRole
+from app.routers.cases import query_accessible_cases
 from app.schemas.case import CaseOut
 
 router = APIRouter()
@@ -24,19 +24,8 @@ def list_municipal_cases(
             detail="Apenas acompanhadores municipais podem acessar esta rota.",
         )
 
-    municipality = (current_user.municipality or "").strip()
-    if not municipality:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Seu cadastro precisa ter um município definido.",
-        )
-
-    query = db.query(ClinicalCase).filter(
-        func.lower(ClinicalCase.municipality) == municipality.lower()
+    return (
+        query_accessible_cases(db, current_user)
+        .order_by(ClinicalCase.created_at.desc())
+        .all()
     )
-
-    state = (current_user.state or "").strip()
-    if state:
-        query = query.filter(func.lower(ClinicalCase.state) == state.lower())
-
-    return query.order_by(ClinicalCase.created_at.desc()).all()

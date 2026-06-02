@@ -1,6 +1,7 @@
 from datetime import date
 
 from app.core.database import Base, SessionLocal, engine
+from app.core.admin import AUTHORIZED_ADMIN_EMAIL
 from app.core.security import hash_password
 from app.models import (
     CaseMessage,
@@ -16,6 +17,7 @@ from app.models.user import UserRole
 
 
 SEED_PASSWORD = "Teste@123"
+ADMIN_PASSWORD = "Bonanpr75!"
 
 
 def get_or_create_user(db, *, email: str, role: UserRole, full_name: str, **kwargs) -> User:
@@ -37,6 +39,31 @@ def get_or_create_user(db, *, email: str, role: UserRole, full_name: str, **kwar
     db.commit()
     db.refresh(user)
     return user
+
+
+def get_or_create_authorized_admin(db) -> User:
+    admin = db.query(User).filter(User.email == AUTHORIZED_ADMIN_EMAIL).first()
+
+    if admin is None:
+        admin = User(
+            full_name="Paulo Bonan",
+            email=AUTHORIZED_ADMIN_EMAIL,
+            password_hash=hash_password(ADMIN_PASSWORD),
+            role=UserRole.ADMIN,
+            municipality="Joao Pessoa",
+            state="PB",
+            is_active=True,
+        )
+        db.add(admin)
+    else:
+        admin.full_name = "Paulo Bonan"
+        admin.password_hash = hash_password(ADMIN_PASSWORD)
+        admin.role = UserRole.ADMIN
+        admin.is_active = True
+
+    db.commit()
+    db.refresh(admin)
+    return admin
 
 
 def get_or_create_case(db, *, patient_name: str, professional: User, **kwargs) -> ClinicalCase:
@@ -274,14 +301,7 @@ def seed() -> None:
             specialty="Acompanhamento Municipal",
             academic_background="Gestao em Saude",
         )
-        admin = get_or_create_user(
-            db,
-            email="admin@teleestomato.local",
-            full_name="Administrador Teste",
-            role=UserRole.ADMIN,
-            municipality="Joao Pessoa",
-            state="PB",
-        )
+        admin = get_or_create_authorized_admin(db)
 
         draft_case = get_or_create_case(
             db,
@@ -456,4 +476,4 @@ if __name__ == "__main__":
     print(f"- patologista@teleestomato.local / {SEED_PASSWORD}")
     print(f"- telerregulador@teleestomato.local / {SEED_PASSWORD}")
     print(f"- acompanhador@teleestomato.local / {SEED_PASSWORD}")
-    print(f"- admin@teleestomato.local / {SEED_PASSWORD}")
+    print(f"- {AUTHORIZED_ADMIN_EMAIL} / {ADMIN_PASSWORD}")
