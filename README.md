@@ -82,6 +82,22 @@ Crie ou atualize as tabelas:
 python create_tables.py
 ```
 
+Opcionalmente, popule o banco com dados ficticios para teste:
+
+```bash
+python seed.py
+```
+
+Contas criadas pelo seed:
+
+```text
+profissional@teleestomato.local / Teste@123
+teleconsultor@teleestomato.local / Teste@123
+patologista@teleestomato.local / Teste@123
+telerregulador@teleestomato.local / Teste@123
+admin@teleestomato.local / Teste@123
+```
+
 Inicie a API:
 
 ```bash
@@ -94,10 +110,17 @@ Em outro terminal, inicie o frontend na raiz do projeto:
 npm run dev
 ```
 
+Para subir banco, backend e frontend juntos a partir da raiz do projeto:
+
+```bash
+npm run dev:all
+```
+
 ## Scripts
 
 ```bash
 npm run dev
+npm run dev:all
 npm run build
 npm run lint
 npm run preview
@@ -105,7 +128,15 @@ npm run preview
 
 ## Deploy no GitHub Pages
 
-O workflow em `.github/workflows/pages.yml` publica apenas o frontend. Antes de usar em producao, configure a variavel do repositorio:
+O workflow em `.github/workflows/pages.yml` publica apenas o frontend no GitHub Pages:
+
+```text
+https://labodontodigitalufpb-png.github.io/telestomatologiaoficial/
+```
+
+No GitHub, configure `Settings` > `Pages` > `Build and deployment` > `Source` como `GitHub Actions`.
+
+Antes de usar em producao, configure a variavel do repositorio:
 
 ```text
 VITE_API_BASE_URL=https://url-publica-do-backend
@@ -113,7 +144,13 @@ VITE_API_BASE_URL=https://url-publica-do-backend
 
 No GitHub: `Settings` > `Secrets and variables` > `Actions` > `Variables`.
 
-O backend FastAPI, o PostgreSQL e o armazenamento de uploads precisam estar hospedados separadamente.
+O workflow tambem configura o caminho base do Vite como:
+
+```text
+VITE_BASE_PATH=/telestomatologiaoficial/
+```
+
+O backend FastAPI, o PostgreSQL e o armazenamento de uploads precisam estar hospedados separadamente em um endereco publico HTTPS.
 
 ## Cuidados de Seguranca
 
