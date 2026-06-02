@@ -263,6 +263,17 @@ def seed() -> None:
             professional_council="CRO-PB 33333",
             academic_background="Saude Coletiva",
         )
+        municipal_follower = get_or_create_user(
+            db,
+            email="acompanhador@teleestomato.local",
+            full_name="Acompanhador Municipal Teste",
+            role=UserRole.ACOMPANHADOR_MUNICIPAL,
+            municipality="Joao Pessoa",
+            state="PB",
+            health_unit="Secretaria Municipal de Saude",
+            specialty="Acompanhamento Municipal",
+            academic_background="Gestao em Saude",
+        )
         admin = get_or_create_user(
             db,
             email="admin@teleestomato.local",
@@ -426,7 +437,7 @@ def seed() -> None:
         get_or_create_message(
             db,
             case=draft_case,
-            sender=admin,
+            sender=municipal_follower,
             content="Mensagem ficticia administrativa para teste interno.",
         )
 
@@ -444,4 +455,5 @@ if __name__ == "__main__":
     print(f"- teleconsultor@teleestomato.local / {SEED_PASSWORD}")
     print(f"- patologista@teleestomato.local / {SEED_PASSWORD}")
     print(f"- telerregulador@teleestomato.local / {SEED_PASSWORD}")
+    print(f"- acompanhador@teleestomato.local / {SEED_PASSWORD}")
     print(f"- admin@teleestomato.local / {SEED_PASSWORD}")

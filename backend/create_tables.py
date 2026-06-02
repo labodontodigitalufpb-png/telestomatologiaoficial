@@ -61,6 +61,7 @@ POSTGRES_ENUM_VALUES = {
         "TELECONSULTOR",
         "PATOLOGISTA",
         "TELERREGULADOR",
+        "ACOMPANHADOR_MUNICIPAL",
         "ADMIN",
     ],
     "casestatus": [

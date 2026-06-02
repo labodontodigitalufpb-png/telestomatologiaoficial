@@ -15,6 +15,7 @@ import {
   listRegulatorCases,
   updateFollowup,
 } from "./services/telerregulador";
+import { listMunicipalCases } from "./services/acompanhador";
 import {
   getPathologistCaseDetail,
   listPathologistCases,
@@ -36,6 +37,7 @@ type Screen =
   | "teleconsultor"
   | "patologista"
   | "telerregulador"
+  | "acompanhador"
   | "dashboard";
 
 type MessageState = {
@@ -129,6 +131,28 @@ const specialtyOptions = [
 const professionalCouncilOptions = ["TSB", "ACD", "Enfermeiro", "Médico", "Cirurgião Dentista"];
 
 const assetPath = (filename: string) => `${import.meta.env.BASE_URL}${filename}`;
+
+const screenMeta: Record<Screen, { label: string; title: string }> = {
+  login: { label: "Inicial / Login", title: "Acesso" },
+  cadastro: { label: "Cadastro", title: "Cadastro Profissional" },
+  profissional: { label: "Profissional", title: "Relato de Caso" },
+  teleconsultor: { label: "Teleconsultor", title: "Teleconsultoria" },
+  patologista: { label: "Patologista", title: "Patologia" },
+  telerregulador: { label: "Telerregulador", title: "Telerregulação" },
+  acompanhador: { label: "Acompanhador Municipal", title: "Acompanhamento Municipal" },
+  dashboard: { label: "Dashboard", title: "Indicadores" },
+};
+
+const navItems: Array<{ screen: Screen; label: string }> = [
+  { screen: "login", label: screenMeta.login.label },
+  { screen: "cadastro", label: screenMeta.cadastro.label },
+  { screen: "profissional", label: screenMeta.profissional.label },
+  { screen: "teleconsultor", label: screenMeta.teleconsultor.label },
+  { screen: "patologista", label: screenMeta.patologista.label },
+  { screen: "telerregulador", label: screenMeta.telerregulador.label },
+  { screen: "acompanhador", label: screenMeta.acompanhador.label },
+  { screen: "dashboard", label: screenMeta.dashboard.label },
+];
 
 const valuationOptions = {
   objectives: [
@@ -259,8 +283,8 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-      <h2 className="text-lg font-bold text-slate-900 mb-4">{title}</h2>
+    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm sm:p-5">
+      <h2 className="mb-4 text-base font-bold text-slate-900 sm:text-lg">{title}</h2>
       {children}
     </div>
   );
@@ -284,7 +308,7 @@ function Input({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        className="min-h-11 w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:text-sm"
       />
     </div>
   );
@@ -309,7 +333,7 @@ function TextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={4}
-        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        className="min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:text-sm"
       />
     </div>
   );
@@ -339,12 +363,12 @@ function CheckboxGroup({
       <legend className="px-1 text-sm font-medium text-slate-700">{label}</legend>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {options.map((option) => (
-          <label key={option} className="flex items-start gap-2 text-sm text-slate-700">
+          <label key={option} className="flex min-h-11 items-start gap-2 rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-700 transition active:scale-[0.99] sm:border-transparent">
             <input
               type="checkbox"
               checked={values.includes(option)}
               onChange={() => toggleOption(option)}
-              className="mt-1"
+              className="mt-1 h-4 w-4 accent-emerald-600"
             />
             <span>{option}</span>
           </label>
@@ -355,9 +379,10 @@ function CheckboxGroup({
 }
 
 function caseIdentifier(item: any) {
-  const userName = item.professional_name || `Usuário ${item.professional_id}`;
+  const patientName = item.patient_name || "Paciente não informado";
+  const municipality = item.municipality || "Município não informado";
   const state = item.state || "Estado não informado";
-  return `Caso #${item.id} - ${userName} - ${state}`;
+  return `Caso #${item.id} - ${patientName} - ${municipality}/${state}`;
 }
 
 function displayValue(value: any) {
@@ -367,11 +392,24 @@ function displayValue(value: any) {
   return value || "Não informado";
 }
 
+function displayDate(value: any) {
+  if (!value) return "Data não informada";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+
+  return parsed.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 function DetailField({ label, value }: { label: string; value: any }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
       <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
-      <div className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{displayValue(value)}</div>
+      <div className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-800">{displayValue(value)}</div>
     </div>
   );
 }
@@ -664,15 +702,18 @@ export default function App() {
   const [teleCases, setTeleCases] = useState<any[]>([]);
   const [pathologistCases, setPathologistCases] = useState<any[]>([]);
   const [regulatorCases, setRegulatorCases] = useState<any[]>([]);
+  const [municipalCases, setMunicipalCases] = useState<any[]>([]);
 
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [selectedResponseCaseId, setSelectedResponseCaseId] = useState<string>("");
   const [selectedPathologistCaseId, setSelectedPathologistCaseId] = useState<string>("");
   const [selectedFollowupCaseId, setSelectedFollowupCaseId] = useState<string>("");
+  const [selectedMunicipalCaseId, setSelectedMunicipalCaseId] = useState<string>("");
   const [caseDetail, setCaseDetail] = useState<any>(null);
   const [teleCaseDetail, setTeleCaseDetail] = useState<any>(null);
   const [pathologistCaseDetail, setPathologistCaseDetail] = useState<any>(null);
   const [regulatorCaseDetail, setRegulatorCaseDetail] = useState<any>(null);
+  const [municipalCaseDetail, setMunicipalCaseDetail] = useState<any>(null);
   const [followups, setFollowups] = useState<any[]>([]);
   const [followupIdToEdit, setFollowupIdToEdit] = useState<string>("");
 
@@ -718,16 +759,20 @@ export default function App() {
     setMessage({ type: "", text: "" });
   }
 
+  function goToRoleHome(role: string | null) {
+    if (role === "TELECONSULTOR") changeScreen("teleconsultor");
+    else if (role === "PATOLOGISTA") changeScreen("patologista");
+    else if (role === "TELERREGULADOR") changeScreen("telerregulador");
+    else if (role === "ACOMPANHADOR_MUNICIPAL") changeScreen("acompanhador");
+    else changeScreen("profissional");
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     clearMessage();
     try {
       await login(loginEmail, loginPassword);
-      const role = getCurrentUserRole();
-      if (role === "TELECONSULTOR") setScreen("teleconsultor");
-      else if (role === "PATOLOGISTA") setScreen("patologista");
-      else if (role === "TELERREGULADOR") setScreen("telerregulador");
-      else setScreen("profissional");
+      goToRoleHome(getCurrentUserRole());
       showSuccess("Login realizado com sucesso.");
     } catch (error: any) {
       showError(error.message);
@@ -742,13 +787,15 @@ export default function App() {
       return;
     }
     try {
-      await registerUser({
+      const createdUser = await registerUser({
         ...registerForm,
         age: registerForm.age ? Number(registerForm.age) : null,
         specialty: registerForm.specialty.join(", "),
         professional_council: registerForm.professional_council.join(", "),
       });
-      showSuccess("Usuário cadastrado com sucesso.");
+      await login(createdUser.email, registerForm.password);
+      goToRoleHome(getCurrentUserRole());
+      showSuccess("Usuário cadastrado e login realizado com sucesso.");
     } catch (error: any) {
       showError(error.message);
     }
@@ -757,6 +804,17 @@ export default function App() {
   async function handleCreateCase(e: React.FormEvent) {
     e.preventDefault();
     clearMessage();
+    const role = getCurrentUserRole();
+    if (!role) {
+      showError("Faça login antes de criar um caso.");
+      changeScreen("login");
+      return;
+    }
+    if (role !== "PROFESSIONAL") {
+      showError("Apenas o perfil Profissional pode criar casos.");
+      return;
+    }
+
     try {
       const createdCase = await createCase({
         ...caseForm,
@@ -924,6 +982,30 @@ export default function App() {
     }
   }
 
+  async function handleLoadMunicipalCases() {
+    clearMessage();
+    try {
+      const data = await listMunicipalCases();
+      setMunicipalCases(data);
+      showSuccess("Casos do município carregados com sucesso.");
+    } catch (error: any) {
+      setMunicipalCases([]);
+      showError(error.message);
+    }
+  }
+
+  async function handleSelectMunicipalCase(caseId: number) {
+    clearMessage();
+    try {
+      const data = await getCaseDetail(caseId);
+      setSelectedMunicipalCaseId(String(caseId));
+      setMunicipalCaseDetail(data);
+      showSuccess("Detalhes do caso municipal carregados.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
   async function handleSelectRegulatorCase(caseId: number) {
     clearMessage();
     try {
@@ -1045,6 +1127,31 @@ export default function App() {
     setPathologistCaseDetail(null);
   }, [selectedPathologistCaseId]);
 
+  useEffect(() => {
+    setMunicipalCaseDetail(null);
+  }, [selectedMunicipalCaseId]);
+
+  useEffect(() => {
+    document.title = `${screenMeta[screen].title} | Telestomatologia no SUS`;
+  }, [screen]);
+
+  function changeScreen(nextScreen: Screen) {
+    setScreen(nextScreen);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function navButtonClass(target: Screen) {
+    const active = screen === target;
+
+    return [
+      "min-h-11 shrink-0 rounded-xl px-4 py-2 text-sm font-semibold transition",
+      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600",
+      active
+        ? "bg-emerald-600 text-white shadow-sm"
+        : "border border-slate-300 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50",
+    ].join(" ");
+  }
+
   const showCaseChat =
     screen === "profissional" ||
     screen === "teleconsultor" ||
@@ -1053,53 +1160,51 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Telestomatologia no SUS</h1>
+      <div className="mx-auto max-w-7xl space-y-5 p-3 sm:p-4 md:p-8 md:space-y-6">
+        <div className="sticky top-0 z-20 -mx-3 border-b border-slate-200 bg-white/95 px-3 py-4 shadow-sm backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:p-5 md:static md:flex md:flex-col md:gap-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                {screenMeta[screen].title}
+              </p>
+              <h1 className="text-xl font-bold sm:text-2xl">Telestomatologia no SUS</h1>
             <p className="text-sm text-slate-600">
               Prática de apoio para envio e teleconsultoria de casos de doenças da boca.
             </p>
-          </div>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setScreen("login")} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
-              Inicial / Login
-            </button>
-            <button onClick={() => setScreen("cadastro")} className="px-4 py-2 rounded-xl border border-slate-300">
-              Cadastro
-            </button>
-            <button onClick={() => setScreen("profissional")} className="px-4 py-2 rounded-xl border border-slate-300">
-              Profissional
-            </button>
-            <button onClick={() => setScreen("teleconsultor")} className="px-4 py-2 rounded-xl border border-slate-300">
-              Teleconsultor
-            </button>
-            <button onClick={() => setScreen("patologista")} className="px-4 py-2 rounded-xl border border-slate-300">
-              Patologista
-            </button>
-            <button onClick={() => setScreen("telerregulador")} className="px-4 py-2 rounded-xl border border-slate-300">
-              Telerregulador
-            </button>
-            <button onClick={() => setScreen("dashboard")} className="px-4 py-2 rounded-xl border border-slate-300">
-              Dashboard
-            </button>
             <button
               onClick={() => {
                 logout();
-                setScreen("login");
+                changeScreen("login");
                 showSuccess("Logout realizado.");
               }}
-              className="px-4 py-2 rounded-xl bg-rose-600 text-white"
+              className="min-h-11 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 active:scale-[0.99]"
             >
               Sair
             </button>
           </div>
-        </div>
+
+          <nav className="-mx-1 overflow-x-auto px-1 pb-1" aria-label="Navegação principal">
+            <div className="flex min-w-max gap-2 md:flex-wrap">
+              {navItems.map((item) => (
+                <button
+                  key={item.screen}
+                  type="button"
+                  onClick={() => changeScreen(item.screen)}
+                  className={navButtonClass(item.screen)}
+                  aria-current={screen === item.screen ? "page" : undefined}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </nav>
+          </div>
 
         {message.text && (
           <div
-            className={`rounded-2xl p-4 text-sm ${
+            className={`rounded-xl p-4 text-sm ${
               message.type === "success"
                 ? "bg-emerald-50 border border-emerald-200 text-emerald-800"
                 : "bg-rose-50 border border-rose-200 text-rose-800"
@@ -1123,7 +1228,7 @@ export default function App() {
                     <img
                       src={assetPath("labodigit.jpeg")}
                       alt="LABODIGIT - Laboratório de Odontologia Digital"
-                      className="w-full aspect-square object-cover rounded-xl border border-slate-200"
+                      className="aspect-square w-full rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
                     />
                   </div>
                   <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
@@ -1160,7 +1265,7 @@ export default function App() {
                     <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">
                       Entrar
                     </button>
-                    <button type="button" onClick={() => setScreen("cadastro")} className="px-5 py-3 rounded-xl border border-slate-300">
+                    <button type="button" onClick={() => changeScreen("cadastro")} className="px-5 py-3 rounded-xl border border-slate-300">
                       Cadastrar
                     </button>
                   </div>
@@ -1207,12 +1312,13 @@ export default function App() {
                 <select
                   value={registerForm.role}
                   onChange={(e) => setRegisterForm({ ...registerForm, role: e.target.value })}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  className="min-h-11 w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 sm:text-sm"
                 >
                   <option value="PROFESSIONAL">PROFISSIONAL</option>
                   <option value="TELECONSULTOR">TELECONSULTOR</option>
                   <option value="PATOLOGISTA">PATOLOGISTA</option>
                   <option value="TELERREGULADOR">TELERREGULADOR</option>
+                  <option value="ACOMPANHADOR_MUNICIPAL">ACOMPANHADOR MUNICIPAL</option>
                 </select>
               </div>
 
@@ -1428,9 +1534,7 @@ export default function App() {
               </form>
 
               {pathologistCaseDetail && (
-                <pre className="mt-4 bg-slate-900 text-slate-100 rounded-xl p-4 overflow-auto text-xs">
-                  {JSON.stringify(pathologistCaseDetail, null, 2)}
-                </pre>
+                <CaseReportView detail={pathologistCaseDetail} />
               )}
             </SectionCard>
           </div>
@@ -1501,6 +1605,53 @@ export default function App() {
                   <FollowupList items={followups} />
                 )}
               </form>
+            </SectionCard>
+          </div>
+        )}
+
+        {screen === "acompanhador" && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <SectionCard title="Casos do município">
+              <button onClick={handleLoadMunicipalCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white mb-4">
+                Atualizar casos do município
+              </button>
+
+              <div className="space-y-3">
+                {municipalCases.length === 0 && (
+                  <p className="text-sm text-slate-600">
+                    Nenhum caso carregado. Atualize a lista para visualizar os casos vinculados ao seu município.
+                  </p>
+                )}
+
+                {municipalCases.map((item) => (
+                  <div key={item.id} className="border border-slate-200 rounded-xl p-4">
+                    <div className="font-semibold">{caseIdentifier(item)}</div>
+                    <div className="text-sm text-slate-600">Data de envio: {displayDate(item.created_at)}</div>
+                    <div className="text-sm text-slate-600">Status: {item.status}</div>
+                    <div className="text-sm text-slate-600">Unidade: {item.health_unit || "Não informada"}</div>
+                    <button onClick={() => handleSelectMunicipalCase(item.id)} className="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">
+                      Ver detalhes
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="Detalhe do caso municipal">
+              <Input label="ID do caso" value={selectedMunicipalCaseId} onChange={setSelectedMunicipalCaseId} />
+              <div className="mt-3">
+                <button type="button" onClick={() => selectedMunicipalCaseId && handleSelectMunicipalCase(Number(selectedMunicipalCaseId))} className="px-4 py-2 rounded-xl border border-slate-300">
+                  Ver detalhe completo
+                </button>
+              </div>
+
+              {municipalCaseDetail ? (
+                <ProfessionalCaseDetail detail={municipalCaseDetail} />
+              ) : (
+                <p className="mt-4 text-sm text-slate-600">
+                  Selecione um caso da lista para visualizar relato, resposta, laudo, arquivos e seguimentos.
+                </p>
+              )}
             </SectionCard>
           </div>
         )}

@@ -95,6 +95,7 @@ profissional@teleestomato.local / Teste@123
 teleconsultor@teleestomato.local / Teste@123
 patologista@teleestomato.local / Teste@123
 telerregulador@teleestomato.local / Teste@123
+acompanhador@teleestomato.local / Teste@123
 admin@teleestomato.local / Teste@123
 ```
 

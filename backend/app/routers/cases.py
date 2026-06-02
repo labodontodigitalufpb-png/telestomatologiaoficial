@@ -24,6 +24,40 @@ UPLOAD_DIR = Path("uploads/cases")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def user_can_access_case(current_user: User, case: ClinicalCase) -> bool:
+    if current_user.role == UserRole.ADMIN:
+        return True
+
+    if current_user.role == UserRole.PROFESSIONAL and case.professional_id == current_user.id:
+        return True
+
+    if current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id == current_user.id:
+        return True
+
+    if (
+        current_user.role == UserRole.TELERREGULADOR
+        and case.is_suspected
+        and case.sent_to_regulator
+    ):
+        return True
+
+    if current_user.role == UserRole.PATOLOGISTA:
+        return True
+
+    if current_user.role == UserRole.ACOMPANHADOR_MUNICIPAL:
+        user_municipality = (current_user.municipality or "").strip().lower()
+        case_municipality = (case.municipality or "").strip().lower()
+        user_state = (current_user.state or "").strip().lower()
+        case_state = (case.state or "").strip().lower()
+
+        if not user_municipality or user_municipality != case_municipality:
+            return False
+
+        return not user_state or user_state == case_state
+
+    return False
+
+
 @router.post("/", response_model=CaseOut)
 def create_case(
     case_data: CaseCreate,
@@ -121,24 +155,7 @@ def get_case(
             detail="Caso não encontrado."
         )
 
-    allowed = False
-
-    if current_user.role == UserRole.ADMIN:
-        allowed = True
-    elif current_user.role == UserRole.PROFESSIONAL and case.professional_id == current_user.id:
-        allowed = True
-    elif current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id == current_user.id:
-        allowed = True
-    elif (
-        current_user.role == UserRole.TELERREGULADOR
-        and case.is_suspected
-        and case.sent_to_regulator
-    ):
-        allowed = True
-    elif current_user.role == UserRole.PATOLOGISTA:
-        allowed = True
-
-    if not allowed:
+    if not user_can_access_case(current_user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem acesso a este caso."
@@ -280,24 +297,7 @@ def list_case_media(
             detail="Caso não encontrado."
         )
 
-    allowed = False
-
-    if current_user.role == UserRole.ADMIN:
-        allowed = True
-    elif current_user.role == UserRole.PROFESSIONAL and case.professional_id == current_user.id:
-        allowed = True
-    elif current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id == current_user.id:
-        allowed = True
-    elif (
-        current_user.role == UserRole.TELERREGULADOR
-        and case.is_suspected
-        and case.sent_to_regulator
-    ):
-        allowed = True
-    elif current_user.role == UserRole.PATOLOGISTA:
-        allowed = True
-
-    if not allowed:
+    if not user_can_access_case(current_user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem acesso aos arquivos deste caso."
@@ -327,24 +327,7 @@ def get_case_detail(
             detail="Caso não encontrado."
         )
 
-    allowed = False
-
-    if current_user.role == UserRole.ADMIN:
-        allowed = True
-    elif current_user.role == UserRole.PROFESSIONAL and case.professional_id == current_user.id:
-        allowed = True
-    elif current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id == current_user.id:
-        allowed = True
-    elif (
-        current_user.role == UserRole.TELERREGULADOR
-        and case.is_suspected
-        and case.sent_to_regulator
-    ):
-        allowed = True
-    elif current_user.role == UserRole.PATOLOGISTA:
-        allowed = True
-
-    if not allowed:
+    if not user_can_access_case(current_user, case):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem acesso a este caso."
