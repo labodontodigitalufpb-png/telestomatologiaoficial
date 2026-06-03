@@ -53,6 +53,48 @@ class CaseCreate(BaseModel):
     care_units: Optional[List[str]] = Field(default_factory=list)
 
 
+class CaseUpdate(BaseModel):
+    patient_name: Optional[str] = None
+    patient_age: Optional[int] = None
+    patient_sex: Optional[str] = None
+    race_color: Optional[str] = None
+    schooling: Optional[str] = None
+    patient_phone: Optional[str] = None
+    sus_card: Optional[str] = None
+
+    health_unit: Optional[str] = None
+    municipality: Optional[str] = None
+    state: Optional[str] = None
+
+    chief_complaint: Optional[str] = None
+    history_present_illness: Optional[str] = None
+    medical_history: Optional[str] = None
+    dental_history: Optional[str] = None
+    medications: Optional[str] = None
+    extraoral_exam: Optional[str] = None
+    lymphadenopathy: Optional[str] = None
+    lesion_description: Optional[str] = None
+    diagnostic_hypothesis: Optional[str] = None
+
+    specialist_status: Optional[List[str]] = None
+    specialties: Optional[List[str]] = None
+    objectives: Optional[List[str]] = None
+    skin_colors: Optional[List[str]] = None
+    anatomical_locations: Optional[List[str]] = None
+    fundamental_lesions: Optional[List[str]] = None
+    habits_and_addictions: Optional[List[str]] = None
+    lesion_sides: Optional[List[str]] = None
+    lesion_colors: Optional[List[str]] = None
+    lesion_insertions: Optional[List[str]] = None
+    lesion_sizes: Optional[List[str]] = None
+    lesion_surfaces: Optional[List[str]] = None
+    lesion_consistencies: Optional[List[str]] = None
+    lesion_symptomatologies: Optional[List[str]] = None
+    pre_existing_conditions: Optional[List[str]] = None
+    image_quality: Optional[List[str]] = None
+    care_units: Optional[List[str]] = None
+
+
 class CaseOut(BaseModel):
     id: int
     professional_id: int

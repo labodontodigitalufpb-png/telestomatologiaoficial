@@ -7,6 +7,13 @@ export async function createCase(payload) {
   });
 }
 
+export async function updateCase(caseId, payload) {
+  return apiFetch(`/cases/${caseId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function listMyCases() {
   return apiFetch("/cases/mine");
 }

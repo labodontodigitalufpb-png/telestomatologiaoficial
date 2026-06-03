@@ -18,7 +18,7 @@ from app.models.response import TeleconsultResponse
 from app.models.followup import RegulatorFollowUp
 from app.models.pathology_report import PathologyReport
 from app.models.user import User, UserRole
-from app.schemas.case import CaseCreate, CaseOut, CaseDetailOut
+from app.schemas.case import CaseCreate, CaseUpdate, CaseOut, CaseDetailOut
 from app.schemas.case_media import CaseMediaOut
 from app.services.case_distribution import assign_case_to_teleconsultor
 
@@ -26,6 +26,65 @@ router = APIRouter()
 
 UPLOAD_DIR = Path("uploads/cases")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+CASE_EDITABLE_FIELDS = [
+    "patient_name",
+    "patient_age",
+    "patient_sex",
+    "race_color",
+    "schooling",
+    "patient_phone",
+    "sus_card",
+    "health_unit",
+    "municipality",
+    "state",
+    "chief_complaint",
+    "history_present_illness",
+    "medical_history",
+    "dental_history",
+    "medications",
+    "extraoral_exam",
+    "lymphadenopathy",
+    "lesion_description",
+    "diagnostic_hypothesis",
+    "specialist_status",
+    "specialties",
+    "objectives",
+    "skin_colors",
+    "anatomical_locations",
+    "fundamental_lesions",
+    "habits_and_addictions",
+    "lesion_sides",
+    "lesion_colors",
+    "lesion_insertions",
+    "lesion_sizes",
+    "lesion_surfaces",
+    "lesion_consistencies",
+    "lesion_symptomatologies",
+    "pre_existing_conditions",
+    "image_quality",
+    "care_units",
+]
+
+
+def apply_case_update(case: ClinicalCase, case_data: CaseUpdate):
+    update_data = case_data.model_dump(exclude_unset=True)
+
+    if "patient_name" in update_data and not (update_data["patient_name"] or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O nome do paciente é obrigatório.",
+        )
+
+    if "state" in update_data and not (update_data["state"] or "").strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O estado do caso é obrigatório.",
+        )
+
+    for field in CASE_EDITABLE_FIELDS:
+        if field in update_data:
+            setattr(case, field, update_data[field])
 
 
 def user_can_access_case(current_user: User, case: ClinicalCase) -> bool:
@@ -290,6 +349,42 @@ def get_case(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem acesso a este caso."
         )
+
+    return case
+
+
+@router.put("/{case_id}", response_model=CaseOut)
+def update_case(
+    case_id: int,
+    case_data: CaseUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if current_user.role != UserRole.PROFESSIONAL:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas profissionais podem editar casos."
+        )
+
+    case = (
+        db.query(ClinicalCase)
+        .filter(
+            ClinicalCase.id == case_id,
+            ClinicalCase.professional_id == current_user.id
+        )
+        .first()
+    )
+
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso não encontrado."
+        )
+
+    apply_case_update(case, case_data)
+    db.add(case)
+    db.commit()
+    db.refresh(case)
 
     return case
 

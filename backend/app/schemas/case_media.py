@@ -7,6 +7,8 @@ from pydantic import BaseModel
 class CaseMediaBase(BaseModel):
     media_type: str
     file_path: str
+    filename: Optional[str] = None
+    original_filename: Optional[str] = None
     caption: Optional[str] = None
 
 

@@ -8,6 +8,7 @@ import {
   listAllCases,
   listMyCases,
   submitCase,
+  updateCase,
   uploadCaseMedia,
 } from "./services/cases";
 import { listTeleconsultorCases, respondCase } from "./services/teleconsultor";
@@ -103,6 +104,58 @@ const initialCase = {
   image_quality: [] as string[],
   care_units: [] as string[],
 };
+
+type CaseFormSource = Record<string, unknown> & {
+  id?: number;
+  patient_age?: number | string | null;
+};
+
+function stringField(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function listField(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function caseToForm(item: CaseFormSource) {
+  return {
+    ...initialCase,
+    patient_name: stringField(item.patient_name),
+    patient_age: item?.patient_age != null ? String(item.patient_age) : "",
+    patient_sex: stringField(item.patient_sex),
+    race_color: stringField(item.race_color),
+    schooling: stringField(item.schooling),
+    patient_phone: stringField(item.patient_phone),
+    sus_card: stringField(item.sus_card),
+    health_unit: stringField(item.health_unit),
+    municipality: stringField(item.municipality),
+    state: stringField(item.state),
+    chief_complaint: stringField(item.chief_complaint),
+    history_present_illness: stringField(item.history_present_illness),
+    medical_history: stringField(item.medical_history),
+    dental_history: stringField(item.dental_history),
+    medications: stringField(item.medications),
+    extraoral_exam: stringField(item.extraoral_exam),
+    lymphadenopathy: stringField(item.lymphadenopathy),
+    lesion_description: stringField(item.lesion_description),
+    diagnostic_hypothesis: stringField(item.diagnostic_hypothesis),
+    objectives: listField(item.objectives),
+    anatomical_locations: listField(item.anatomical_locations),
+    fundamental_lesions: listField(item.fundamental_lesions),
+    habits_and_addictions: listField(item.habits_and_addictions),
+    lesion_sides: listField(item.lesion_sides),
+    lesion_colors: listField(item.lesion_colors),
+    lesion_insertions: listField(item.lesion_insertions),
+    lesion_sizes: listField(item.lesion_sizes),
+    lesion_surfaces: listField(item.lesion_surfaces),
+    lesion_consistencies: listField(item.lesion_consistencies),
+    lesion_symptomatologies: listField(item.lesion_symptomatologies),
+    pre_existing_conditions: listField(item.pre_existing_conditions),
+    image_quality: listField(item.image_quality),
+    care_units: listField(item.care_units),
+  };
+}
 
 const specialtyOptions = [
   "Acupuntura",
@@ -419,6 +472,35 @@ function DetailField({ label, value }: { label: string; value: any }) {
   );
 }
 
+function CaseMediaList({ media }: { media: any[] }) {
+  if (!media.length) {
+    return <p className="mt-2 text-sm text-slate-600">Nenhum arquivo registrado.</p>;
+  }
+
+  return (
+    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {media.map((file: any) => {
+        const label = file.original_filename || `${file.media_type} #${file.id}`;
+
+        return (
+          <div key={file.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase text-slate-500">{file.media_type}</div>
+            {file.media_type === "VIDEO" ? (
+              <video controls src={file.file_path} className="mt-2 aspect-video w-full rounded-lg bg-black" />
+            ) : null}
+            {file.media_type === "IMAGE" ? (
+              <img src={file.file_path} alt={label} className="mt-2 max-h-64 w-full rounded-lg object-contain bg-white" />
+            ) : null}
+            <a href={file.file_path} target="_blank" rel="noreferrer" className="mt-2 block break-words text-sm font-medium text-blue-700 underline">
+              {label}
+            </a>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProfessionalCaseDetail({ detail }: { detail: any }) {
   const item = detail?.case || {};
   const response = detail?.response;
@@ -495,17 +577,7 @@ function ProfessionalCaseDetail({ detail }: { detail: any }) {
 
       <div className="rounded-xl border border-slate-200 p-4">
         <h3 className="font-semibold text-slate-900">Arquivos do caso</h3>
-        {media.length ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {media.map((file: any) => (
-              <a key={file.id} href={file.file_path} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-blue-700 underline">
-                {file.media_type} #{file.id}
-              </a>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">Nenhum arquivo registrado.</p>
-        )}
+        <CaseMediaList media={media} />
       </div>
     </div>
   );
@@ -582,17 +654,7 @@ function CaseReportView({ detail }: { detail: any }) {
       </div>
       <div className="mt-4">
         <h4 className="text-sm font-semibold text-slate-800">Arquivos enviados</h4>
-        {media.length ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            {media.map((file: any) => (
-              <a key={file.id} href={file.file_path} target="_blank" rel="noreferrer" className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-blue-700 underline">
-                {file.media_type} #{file.id}
-              </a>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm text-slate-600">Nenhum arquivo registrado.</p>
-        )}
+        <CaseMediaList media={media} />
       </div>
     </div>
   );
@@ -700,6 +762,7 @@ export default function App() {
 
   const [registerForm, setRegisterForm] = useState(initialRegister);
   const [caseForm, setCaseForm] = useState(initialCase);
+  const [editingCaseId, setEditingCaseId] = useState<number | null>(null);
   const [teleResponseForm, setTeleResponseForm] = useState(initialResponse);
   const [followupForm, setFollowupForm] = useState(initialFollowup);
 
@@ -734,12 +797,14 @@ export default function App() {
     attachment2: File | null;
     attachment3: File | null;
     attachment4: File | null;
+    video: File | null;
     consent: File | null;
   }>({
     attachment1: null,
     attachment2: null,
     attachment3: null,
     attachment4: null,
+    video: null,
     consent: null,
   });
 
@@ -825,45 +890,74 @@ export default function App() {
     }
 
     try {
-      const createdCase = await createCase({
+      const casePayload = {
         ...caseForm,
         patient_age: caseForm.patient_age ? Number(caseForm.patient_age) : null,
-      });
+      };
+
+      const savedCase = editingCaseId
+        ? await updateCase(editingCaseId, casePayload)
+        : await createCase(casePayload);
 
       const pendingUploads: Array<{ file: File | null; mediaType: string }> = [
         { file: caseFiles.attachment1, mediaType: "IMAGE" },
         { file: caseFiles.attachment2, mediaType: "IMAGE" },
         { file: caseFiles.attachment3, mediaType: "EXAM" },
         { file: caseFiles.attachment4, mediaType: "EXAM" },
+        { file: caseFiles.video, mediaType: "VIDEO" },
         { file: caseFiles.consent, mediaType: "CONSENT" },
       ];
 
       let uploadedCount = 0;
       for (const item of pendingUploads) {
         if (item.file) {
-          await uploadCaseMedia(createdCase.id, item.mediaType, item.file);
+          await uploadCaseMedia(savedCase.id, item.mediaType, item.file);
           uploadedCount += 1;
         }
       }
 
       setCaseForm(initialCase);
+      setEditingCaseId(null);
       setCaseFiles({
         attachment1: null,
         attachment2: null,
         attachment3: null,
         attachment4: null,
+        video: null,
         consent: null,
       });
 
       showSuccess(
         uploadedCount > 0
-          ? `Caso criado e ${uploadedCount} arquivo(s) enviado(s) com sucesso.`
-          : "Caso criado com sucesso."
+          ? `Caso ${editingCaseId ? "atualizado" : "criado"} e ${uploadedCount} arquivo(s) enviado(s) com sucesso.`
+          : `Caso ${editingCaseId ? "atualizado" : "criado"} com sucesso.`
       );
       await handleLoadMyCases();
     } catch (error: any) {
       showError(error.message);
     }
+  }
+
+  function handleStartEditCase(item: CaseFormSource & { id: number }) {
+    clearMessage();
+    setCaseForm(caseToForm(item));
+    setEditingCaseId(item.id);
+    setSelectedCaseId(String(item.id));
+    showSuccess(`Caso #${item.id} carregado para edição.`);
+  }
+
+  function handleCancelCaseEdit() {
+    clearMessage();
+    setCaseForm(initialCase);
+    setEditingCaseId(null);
+    setCaseFiles({
+      attachment1: null,
+      attachment2: null,
+      attachment3: null,
+      attachment4: null,
+      video: null,
+      consent: null,
+    });
   }
 
   async function handleLoadMyCases() {
@@ -1385,7 +1479,7 @@ export default function App() {
 
         {screen === "profissional" && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <SectionCard title="Relato de caso">
+            <SectionCard title={editingCaseId ? `Editando caso #${editingCaseId}` : "Relato de caso"}>
               <form onSubmit={handleCreateCase} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Input label="Nome do paciente" value={caseForm.patient_name} onChange={(v) => setCaseForm({ ...caseForm, patient_name: v })} />
                 <Input label="Idade" value={caseForm.patient_age} onChange={(v) => setCaseForm({ ...caseForm, patient_age: v })} />
@@ -1444,14 +1538,23 @@ export default function App() {
                   <input type="file" onChange={(e) => setCaseFiles({ ...caseFiles, attachment4: e.target.files?.[0] || null })} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                 </div>
                 <div className="md:col-span-2 space-y-1">
+                  <label className="text-sm font-medium text-slate-700">Vídeo do caso</label>
+                  <input type="file" accept="video/*" onChange={(e) => setCaseFiles({ ...caseFiles, video: e.target.files?.[0] || null })} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                </div>
+                <div className="md:col-span-2 space-y-1">
                   <label className="text-sm font-medium text-slate-700">Termo de consentimento (TCLE)</label>
                   <input type="file" onChange={(e) => setCaseFiles({ ...caseFiles, consent: e.target.files?.[0] || null })} className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                 </div>
 
                 <div className="md:col-span-2">
                   <button type="submit" className="px-5 py-3 rounded-xl bg-emerald-600 text-white font-semibold">
-                    Criar caso
+                    {editingCaseId ? "Salvar alterações" : "Criar caso"}
                   </button>
+                  {editingCaseId && (
+                    <button type="button" onClick={handleCancelCaseEdit} className="ml-2 px-5 py-3 rounded-xl border border-slate-300 font-semibold">
+                      Cancelar edição
+                    </button>
+                  )}
                 </div>
               </form>
             </SectionCard>
@@ -1473,8 +1576,16 @@ export default function App() {
                     <div className="text-sm text-slate-600">Paciente: {item.patient_name}</div>
                     <div className="text-sm text-slate-600">Status: {item.status}</div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <button onClick={() => handleSubmitCase(item.id)} className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">
-                        Submeter caso
+                      <button onClick={() => handleStartEditCase(item)} className="px-3 py-2 rounded-xl border border-slate-300 text-sm">
+                        Editar caso
+                      </button>
+                      {item.status === "DRAFT" && (
+                        <button onClick={() => handleSubmitCase(item.id)} className="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">
+                          Submeter caso
+                        </button>
+                      )}
+                      <button onClick={() => setChatCaseId(String(item.id))} className="px-3 py-2 rounded-xl border border-slate-300 text-sm">
+                        Abrir chat
                       </button>
                     </div>
                   </div>
