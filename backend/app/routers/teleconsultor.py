@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.teleconsultor import is_universal_teleconsultor_email
 from app.models.case import ClinicalCase, CaseStatus
 from app.models.response import TeleconsultResponse
 from app.models.user import User, UserRole
@@ -14,12 +15,16 @@ from app.schemas.response import TeleconsultResponseCreate, TeleconsultResponseO
 router = APIRouter()
 
 
+def can_work_as_teleconsultor(user: User) -> bool:
+    return user.role == UserRole.TELECONSULTOR or is_universal_teleconsultor_email(user.email)
+
+
 @router.get("/my-cases", response_model=List[CaseOut])
 def list_my_assigned_cases(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != UserRole.TELECONSULTOR:
+    if not can_work_as_teleconsultor(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Apenas teleconsultores podem acessar esta rota."
@@ -42,7 +47,7 @@ def respond_case(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != UserRole.TELECONSULTOR:
+    if not can_work_as_teleconsultor(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Apenas teleconsultores podem responder casos."
@@ -110,7 +115,7 @@ def update_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != UserRole.TELECONSULTOR:
+    if not can_work_as_teleconsultor(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Apenas teleconsultores podem editar respostas."
@@ -163,7 +168,7 @@ def get_case_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role not in [UserRole.TELECONSULTOR, UserRole.PROFESSIONAL, UserRole.TELERREGULADOR, UserRole.PATOLOGISTA, UserRole.ADMIN]:
+    if current_user.role not in [UserRole.TELECONSULTOR, UserRole.PROFESSIONAL, UserRole.TELERREGULADOR, UserRole.PATOLOGISTA, UserRole.ADMIN] and not is_universal_teleconsultor_email(current_user.email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem permissão para acessar esta resposta."
@@ -178,6 +183,16 @@ def get_case_response(
         )
 
     if current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem acesso a esta resposta."
+        )
+
+    if (
+        current_user.role != UserRole.ADMIN
+        and is_universal_teleconsultor_email(current_user.email)
+        and case.assigned_teleconsultor_id != current_user.id
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem acesso a esta resposta."

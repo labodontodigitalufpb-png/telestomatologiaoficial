@@ -48,3 +48,7 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool

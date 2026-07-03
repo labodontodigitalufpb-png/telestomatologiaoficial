@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.teleconsultor import is_universal_teleconsultor_email
 from app.models.case import ClinicalCase, CaseStatus
 from app.models.case_media import CaseMedia, CaseMediaType
 from app.models.message import CaseMessage
@@ -97,6 +98,9 @@ def user_can_access_case(current_user: User, case: ClinicalCase) -> bool:
     if current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id == current_user.id:
         return True
 
+    if is_universal_teleconsultor_email(current_user.email) and case.assigned_teleconsultor_id == current_user.id:
+        return True
+
     if (
         current_user.role == UserRole.TELERREGULADOR
         and case.is_suspected
@@ -131,6 +135,9 @@ def query_accessible_cases(db: Session, current_user: User):
         return query.filter(ClinicalCase.professional_id == current_user.id)
 
     if current_user.role == UserRole.TELECONSULTOR:
+        return query.filter(ClinicalCase.assigned_teleconsultor_id == current_user.id)
+
+    if is_universal_teleconsultor_email(current_user.email):
         return query.filter(ClinicalCase.assigned_teleconsultor_id == current_user.id)
 
     if current_user.role == UserRole.TELERREGULADOR:

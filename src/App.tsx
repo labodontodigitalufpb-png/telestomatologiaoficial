@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getCurrentUserRole, login, logout } from "./services/auth";
-import { registerUser } from "./services/users";
+import { deleteUser, listUsers, registerUser, updateUserStatus } from "./services/users";
 import {
   createCase,
   exportCasesCsv,
@@ -47,6 +47,16 @@ type Screen =
 type MessageState = {
   type: "success" | "error" | "";
   text: string;
+};
+
+type AdminUser = {
+  id: number;
+  full_name: string;
+  email: string;
+  role: string;
+  municipality?: string | null;
+  state?: string | null;
+  is_active: boolean;
 };
 
 const initialRegister = {
@@ -198,6 +208,15 @@ const screenMeta: Record<Screen, { label: string; title: string }> = {
   acompanhador: { label: "Acompanhador Municipal", title: "Acompanhamento Municipal" },
   admin: { label: "Administrador Geral", title: "Administração Geral" },
   dashboard: { label: "Dashboard", title: "Indicadores" },
+};
+
+const userRoleLabels: Record<string, string> = {
+  PROFESSIONAL: "Profissional",
+  TELECONSULTOR: "Teleconsultor",
+  PATOLOGISTA: "Patologista",
+  TELERREGULADOR: "Telerregulador",
+  ACOMPANHADOR_MUNICIPAL: "Acompanhador Municipal",
+  ADMIN: "Administrador Geral",
 };
 
 const navItems: Array<{ screen: Screen; label: string }> = [
@@ -772,6 +791,7 @@ export default function App() {
   const [regulatorCases, setRegulatorCases] = useState<any[]>([]);
   const [municipalCases, setMunicipalCases] = useState<any[]>([]);
   const [adminCases, setAdminCases] = useState<any[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
 
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [selectedResponseCaseId, setSelectedResponseCaseId] = useState<string>("");
@@ -1128,6 +1148,42 @@ export default function App() {
       setSelectedAdminCaseId(String(caseId));
       setAdminCaseDetail(data);
       showSuccess("Detalhes do caso carregados para administração.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleLoadAdminUsers() {
+    clearMessage();
+    try {
+      const data = await listUsers();
+      setAdminUsers(data);
+      showSuccess("Usuários carregados com sucesso.");
+    } catch (error: any) {
+      setAdminUsers([]);
+      showError(error.message);
+    }
+  }
+
+  async function handleToggleUserStatus(user: AdminUser) {
+    clearMessage();
+    try {
+      await updateUserStatus(user.id, !user.is_active);
+      await handleLoadAdminUsers();
+      showSuccess(user.is_active ? "Usuário bloqueado com sucesso." : "Usuário desbloqueado com sucesso.");
+    } catch (error: any) {
+      showError(error.message);
+    }
+  }
+
+  async function handleDeleteUser(user: AdminUser) {
+    if (!window.confirm(`Remover o usuário ${user.full_name}? Essa ação não poderá ser desfeita.`)) return;
+
+    clearMessage();
+    try {
+      await deleteUser(user.id);
+      await handleLoadAdminUsers();
+      showSuccess("Usuário removido com sucesso.");
     } catch (error: any) {
       showError(error.message);
     }
@@ -1843,54 +1899,106 @@ export default function App() {
         )}
 
         {screen === "admin" && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <SectionCard title="Todos os casos enviados">
+          <div className="space-y-6">
+            <SectionCard title="Gerenciamento de usuários">
               <div className="flex flex-wrap gap-2 mb-4">
-                <button onClick={handleLoadAdminCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
-                  Atualizar todos os casos
-                </button>
-                <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
-                  Baixar planilha geral
+                <button onClick={handleLoadAdminUsers} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                  Atualizar usuários
                 </button>
               </div>
 
               <div className="space-y-3">
-                {adminCases.length === 0 && (
+                {adminUsers.length === 0 && (
                   <p className="text-sm text-slate-600">
-                    Nenhum caso carregado. Atualize a lista para visualizar todos os casos enviados.
+                    Nenhum usuário carregado. Atualize a lista para visualizar cadastros, bloquear acessos ou remover usuários sem vínculos clínicos.
                   </p>
                 )}
 
-                {adminCases.map((item) => (
-                  <div key={item.id} className="border border-slate-200 rounded-xl p-4">
-                    <div className="font-semibold">{caseIdentifier(item)}</div>
-                    <div className="text-sm text-slate-600">Data de envio: {displayDate(item.created_at)}</div>
-                    <div className="text-sm text-slate-600">Status: {item.status}</div>
-                    <div className="text-sm text-slate-600">Unidade: {item.health_unit || "Não informada"}</div>
-                    <button onClick={() => handleSelectAdminCase(item.id)} className="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">
-                      Ver detalhes
-                    </button>
+                {adminUsers.map((user) => (
+                  <div key={user.id} className="border border-slate-200 rounded-xl p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="font-semibold text-slate-900">{user.full_name}</div>
+                        <div className="text-sm text-slate-600">{user.email}</div>
+                        <div className="mt-1 text-sm text-slate-600">
+                          Perfil: {userRoleLabels[user.role] || user.role} · Município: {user.municipality || "Não informado"} · UF: {user.state || "Não informada"}
+                        </div>
+                        <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${user.is_active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                          {user.is_active ? "Ativo" : "Bloqueado"}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleUserStatus(user)}
+                          className={`px-3 py-2 rounded-xl text-sm ${user.is_active ? "border border-amber-300 text-amber-800" : "bg-emerald-600 text-white"}`}
+                        >
+                          {user.is_active ? "Bloquear" : "Desbloquear"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteUser(user)}
+                          className="px-3 py-2 rounded-xl border border-rose-300 text-sm text-rose-700"
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             </SectionCard>
 
-            <SectionCard title="Detalhe administrativo do caso">
-              <Input label="ID do caso" value={selectedAdminCaseId} onChange={setSelectedAdminCaseId} />
-              <div className="mt-3">
-                <button type="button" onClick={() => selectedAdminCaseId && handleSelectAdminCase(Number(selectedAdminCaseId))} className="px-4 py-2 rounded-xl border border-slate-300">
-                  Ver detalhe completo
-                </button>
-              </div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <SectionCard title="Todos os casos enviados">
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <button onClick={handleLoadAdminCases} className="px-4 py-2 rounded-xl bg-slate-900 text-white">
+                    Atualizar todos os casos
+                  </button>
+                  <button onClick={handleExportCasesCsv} className="px-4 py-2 rounded-xl border border-slate-300">
+                    Baixar planilha geral
+                  </button>
+                </div>
 
-              {adminCaseDetail ? (
-                <ProfessionalCaseDetail detail={adminCaseDetail} />
-              ) : (
-                <p className="mt-4 text-sm text-slate-600">
-                  Selecione um caso da lista para visualizar relato, resposta, laudo, arquivos, mensagens e seguimentos.
-                </p>
-              )}
-            </SectionCard>
+                <div className="space-y-3">
+                  {adminCases.length === 0 && (
+                    <p className="text-sm text-slate-600">
+                      Nenhum caso carregado. Atualize a lista para visualizar todos os casos enviados.
+                    </p>
+                  )}
+
+                  {adminCases.map((item) => (
+                    <div key={item.id} className="border border-slate-200 rounded-xl p-4">
+                      <div className="font-semibold">{caseIdentifier(item)}</div>
+                      <div className="text-sm text-slate-600">Data de envio: {displayDate(item.created_at)}</div>
+                      <div className="text-sm text-slate-600">Status: {item.status}</div>
+                      <div className="text-sm text-slate-600">Unidade: {item.health_unit || "Não informada"}</div>
+                      <button onClick={() => handleSelectAdminCase(item.id)} className="mt-3 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm">
+                        Ver detalhes
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Detalhe administrativo do caso">
+                <Input label="ID do caso" value={selectedAdminCaseId} onChange={setSelectedAdminCaseId} />
+                <div className="mt-3">
+                  <button type="button" onClick={() => selectedAdminCaseId && handleSelectAdminCase(Number(selectedAdminCaseId))} className="px-4 py-2 rounded-xl border border-slate-300">
+                    Ver detalhe completo
+                  </button>
+                </div>
+
+                {adminCaseDetail ? (
+                  <ProfessionalCaseDetail detail={adminCaseDetail} />
+                ) : (
+                  <p className="mt-4 text-sm text-slate-600">
+                    Selecione um caso da lista para visualizar relato, resposta, laudo, arquivos, mensagens e seguimentos.
+                  </p>
+                )}
+              </SectionCard>
+            </div>
           </div>
         )}
 

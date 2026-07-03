@@ -37,6 +37,12 @@ def get_current_user(
     if user is None:
         raise credentials_exception
 
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuário bloqueado. Entre em contato com a administração.",
+        )
+
     if user.role == UserRole.ADMIN and not is_authorized_admin_email(user.email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

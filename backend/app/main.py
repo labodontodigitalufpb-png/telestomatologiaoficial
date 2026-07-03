@@ -11,6 +11,7 @@ from app.routers.acompanhador import router as acompanhador_router
 from app.routers.patologista import router as patologista_router
 from app.routers.teleconsultor import router as teleconsultor_router
 from app.routers.telerregulador import router as telerregulador_router
+from app.routers.users import router as users_router
 
 app = FastAPI(title="TeleEstomato API")
 
@@ -30,6 +31,7 @@ app.include_router(patologista_router)
 app.include_router(telerregulador_router, prefix="/telerregulador")
 app.include_router(acompanhador_router, prefix="/acompanhador")
 app.include_router(dashboard_router, prefix="/dashboard")
+app.include_router(users_router, prefix="/users")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 

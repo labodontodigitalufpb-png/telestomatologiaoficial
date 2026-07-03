@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
+from app.core.teleconsultor import is_universal_teleconsultor_email
 from app.models.case import ClinicalCase
 from app.models.message import CaseMessage, MessageType
 from app.models.user import User, UserRole
@@ -26,6 +27,9 @@ def user_can_access_case(current_user: User, case: ClinicalCase) -> bool:
         return True
 
     if current_user.role == UserRole.TELECONSULTOR and case.assigned_teleconsultor_id == current_user.id:
+        return True
+
+    if is_universal_teleconsultor_email(current_user.email) and case.assigned_teleconsultor_id == current_user.id:
         return True
 
     if (
